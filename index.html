@@ -174,13 +174,14 @@ const WEAPON_TYPES = [
   { id:'sword',  name:'Schwert',    damage:25, range:55, cooldown:40, color:'#aaddff', icon:'🗡️' },
   { id:'axe',    name:'Axt',        damage:40, range:45, cooldown:65, color:'#ffaa44', icon:'🪓' },
   { id:'staff',  name:'Zauberstab', damage:18, range:90, cooldown:30, color:'#dd88ff', icon:'🪄' },
-  { id:'hammer', name:'Hammer',     damage:55, range:40, cooldown:80, color:'#ff8844', icon:'🔨' },
+  { id:'hammer', name:'Hammer',     damage:55,    range:40,  cooldown:80,  color:'#ff8844', icon:'🔨' },
+  { id:'oneshot', name:'HEILIGE SENSE', damage:99999, range:120, cooldown:300, color:'#ffffff', icon:'☠️', oneshot:true },
 ];
 
 let worldMap=[], player, pumpkins=[], keys={}, gameActive=false;
 let startTime, particles=[], camX=0, camY=0, flickerT=0;
 let weaponPickups=[], hitEffects=[], attackAnim=0, attackAngle=0;
-let wave=0, stage=0, killed=0, totalKilled=0;
+let wave=0, stage=0, killed=0, totalKilled=0, screenFlash=0;
 let waveLabel={text:'',timer:0};
 let stageLabel={text:'',timer:0,color:'#ffffff'};
 let ambientParticles=[];
@@ -203,7 +204,9 @@ function isSolid(mx,my){const c=Math.floor(mx/TILE),r=Math.floor(my/TILE);if(r<0
 function spawnWeapons() {
   weaponPickups=[];
   const spots=[[4,3],[12,3],[22,3],[32,3],[42,3],[7,10],[17,10],[27,10],[37,10],[47,10],[3,18],[13,18],[23,18],[33,18],[43,18],[8,26],[18,26],[28,26],[38,26],[48,26],[5,33],[15,33],[25,33],[35,33],[45,33]];
-  for(let i=0;i<spots.length;i++){const type=WEAPON_TYPES[i%WEAPON_TYPES.length];weaponPickups.push({x:spots[i][0]*TILE,y:spots[i][1]*TILE,type,bob:Math.random()*Math.PI*2});}
+  for(let i=0;i<spots.length;i++){const type=WEAPON_TYPES[i%4];weaponPickups.push({x:spots[i][0]*TILE,y:spots[i][1]*TILE,type,bob:Math.random()*Math.PI*2});}
+  // one-shot scythe — rare, center of map
+  weaponPickups.push({x:25*TILE,y:19*TILE,type:WEAPON_TYPES[4],bob:0,rare:true});
 }
 
 // ── Pumpkins ───────────────────────────────────────────────────────────
@@ -308,6 +311,18 @@ function drawWeaponShape(type,ox,oy,scale){
   else if(type.id==='axe'){ctx.fillStyle='#885522';ctx.fillRect(ox-2,oy-18,4,34);ctx.fillStyle='#cc8833';ctx.beginPath();ctx.moveTo(ox-2,oy-18);ctx.lineTo(ox-14,oy-6);ctx.lineTo(ox-14,oy+6);ctx.lineTo(ox-2,oy-2);ctx.closePath();ctx.fill();ctx.strokeStyle='#ffaa44';ctx.lineWidth=0.5;ctx.stroke();}
   else if(type.id==='staff'){ctx.fillStyle='#6633aa';ctx.fillRect(ox-2,oy-22,4,40);const g=ctx.createRadialGradient(ox,oy-22,1,ox,oy-22,8);g.addColorStop(0,'#ffffff');g.addColorStop(0.5,'#cc88ff');g.addColorStop(1,'rgba(80,0,180,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(ox,oy-22,9,0,Math.PI*2);ctx.fill();}
   else if(type.id==='hammer'){ctx.fillStyle='#663322';ctx.fillRect(ox-2,oy-18,4,36);ctx.fillStyle='#888888';ctx.fillRect(ox-10,oy-18,20,14);ctx.strokeStyle='#aaaaaa';ctx.lineWidth=0.5;ctx.strokeRect(ox-10,oy-18,20,14);}
+  else if(type.id==='oneshot'){
+    // staff/pole
+    ctx.fillStyle='#888899';ctx.fillRect(ox-2,oy-28,4,52);
+    // blade curve
+    ctx.strokeStyle='#ffffff';ctx.lineWidth=3;ctx.shadowColor='#ffffff';ctx.shadowBlur=12;
+    ctx.beginPath();ctx.moveTo(ox-2,oy-28);ctx.bezierCurveTo(ox+30,oy-28,ox+30,oy+4,ox-2,oy+4);ctx.stroke();
+    ctx.strokeStyle='rgba(200,220,255,0.5)';ctx.lineWidth=6;ctx.stroke();
+    ctx.shadowBlur=0;
+    // glow orb
+    const g=ctx.createRadialGradient(ox,oy-28,1,ox,oy-28,10);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.5,'rgba(180,200,255,0.7)');g.addColorStop(1,'rgba(100,120,255,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(ox,oy-28,10,0,Math.PI*2);ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -315,13 +330,33 @@ function drawWeaponPickups(t){
   for(const w of weaponPickups){
     const sx=w.x-camX,sy=w.y-camY;
     if(sx<-40||sx>W+40||sy<-40||sy>H+40)continue;
-    w.bob+=0.05;const bob=Math.sin(w.bob)*4;
-    ctx.shadowColor=w.type.color;ctx.shadowBlur=14;
-    ctx.fillStyle='rgba(0,0,0,0.5)';ctx.beginPath();ctx.ellipse(sx,sy+8,12,5,0,0,Math.PI*2);ctx.fill();
-    ctx.save();ctx.translate(sx,sy+bob);ctx.rotate(Math.PI/5);drawWeaponShape(w.type,0,0,1.0);ctx.restore();
+    w.bob+=w.rare?0.03:0.05;const bob=Math.sin(w.bob)*(w.rare?8:4);
+    if(w.rare){
+      // dramatic pulsing aura for one-shot
+      const pulse=0.5+0.5*Math.sin(t*0.08);
+      const auraR=40+pulse*20;
+      const ag=ctx.createRadialGradient(sx,sy,4,sx,sy,auraR);
+      ag.addColorStop(0,'rgba(255,255,255,0.4)');ag.addColorStop(0.5,'rgba(180,200,255,0.15)');ag.addColorStop(1,'rgba(100,120,255,0)');
+      ctx.fillStyle=ag;ctx.beginPath();ctx.arc(sx,sy,auraR,0,Math.PI*2);ctx.fill();
+      ctx.shadowColor='#ffffff';ctx.shadowBlur=30*pulse;
+      // rotating sparkles
+      for(let i=0;i<6;i++){
+        const a=t*0.04+i*(Math.PI/3);const sr=28+pulse*6;
+        ctx.fillStyle=`rgba(200,220,255,${0.6*pulse})`;ctx.beginPath();ctx.arc(sx+Math.cos(a)*sr,sy+Math.sin(a)*sr,2,0,Math.PI*2);ctx.fill();
+      }
+    } else {
+      ctx.shadowColor=w.type.color;ctx.shadowBlur=14;
+    }
+    ctx.fillStyle='rgba(0,0,0,0.5)';ctx.beginPath();ctx.ellipse(sx,sy+10,w.rare?18:12,5,0,0,Math.PI*2);ctx.fill();
+    ctx.save();ctx.translate(sx,sy+bob);ctx.rotate(Math.PI/5);drawWeaponShape(w.type,0,0,w.rare?1.3:1.0);ctx.restore();
     ctx.shadowBlur=0;
-    ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(sx-28,sy-34+bob,56,14);
-    ctx.fillStyle=w.type.color;ctx.font='11px Georgia';ctx.textAlign='center';ctx.fillText(w.type.name,sx,sy-23+bob);ctx.textAlign='left';
+    const labelW=w.rare?100:56;
+    ctx.fillStyle=w.rare?'rgba(0,0,30,0.85)':'rgba(0,0,0,0.6)';ctx.fillRect(sx-labelW/2,sy-44+bob,labelW,w.rare?26:14);
+    if(w.rare){ctx.strokeStyle='#aaaaff';ctx.lineWidth=1;ctx.strokeRect(sx-labelW/2,sy-44+bob,labelW,26);}
+    ctx.fillStyle=w.type.color;ctx.font=w.rare?'bold 12px Georgia':'11px Georgia';ctx.textAlign='center';
+    ctx.fillText(w.type.name,sx,sy-(w.rare?30:23)+bob);
+    if(w.rare){ctx.fillStyle='#ff8888';ctx.font='10px Georgia';ctx.fillText('ONE-SHOT · SELTEN',sx,sy-18+bob);}
+    ctx.textAlign='left';
   }
 }
 
@@ -507,9 +542,26 @@ function drawHUD(elapsed){
 
   // damage floaters
   for(const e of hitEffects){
-    ctx.globalAlpha=e.life;ctx.fillStyle='#ff4444';ctx.shadowColor='#ff0000';ctx.shadowBlur=8;
-    ctx.font=`bold ${14+Math.floor((1-e.life)*4)}px Georgia`;ctx.fillText(`-${e.dmg}`,e.x-camX,e.y-camY);
+    ctx.globalAlpha=Math.min(1,e.life);
+    if(e.big){
+      ctx.fillStyle='#ffffff';ctx.shadowColor='#aaaaff';ctx.shadowBlur=20;
+      ctx.font=`bold 28px Georgia`;ctx.textAlign='center';
+      ctx.fillText(String(e.dmg),e.x-camX,e.y-camY);
+      ctx.fillStyle='#ffddff';ctx.font='bold 14px Georgia';
+      ctx.fillText('INSTANT KILL',e.x-camX,e.y-camY+18);
+      ctx.textAlign='left';
+    } else {
+      ctx.fillStyle='#ff4444';ctx.shadowColor='#ff0000';ctx.shadowBlur=8;
+      ctx.font=`bold ${14+Math.floor((1-e.life)*4)}px Georgia`;ctx.fillText(`-${e.dmg}`,e.x-camX,e.y-camY);
+    }
     ctx.shadowBlur=0;ctx.globalAlpha=1;
+  }
+
+  // screen flash for one-shot
+  if(screenFlash>0){
+    ctx.globalAlpha=screenFlash/20*0.6;
+    ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha=1;screenFlash--;
   }
 
   // wave label
@@ -544,7 +596,7 @@ function initStage(){
   buildMap();spawnWeapons();
   player={x:25*TILE,y:19*TILE,facing:1,step:0,weapon:null,attackCooldown:0};
   pumpkins=[];particles=[];hitEffects=[];ambientParticles=[];
-  attackAnim=0;wave=0;killed=0;
+  attackAnim=0;wave=0;killed=0;screenFlash=0;
   keys={};gameActive=true;startTime=Date.now();
   camX=player.x-W/2;camY=player.y-H/2;
   // show stage intro label
@@ -585,15 +637,24 @@ function loop(ts){
   if((keys[' ']||keys['Space'])&&player.weapon&&player.attackCooldown===0&&alive.length>0){
     const nearest=alive.reduce((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)<Math.hypot(b.x-player.x,b.y-player.y)?a:b);
     attackAnim=15;attackAngle=Math.atan2(nearest.y-player.y,nearest.x-player.x);player.attackCooldown=player.weapon.cooldown;
+    const isOneShot=player.weapon.id==='oneshot';
+    const hitRange=isOneShot?W*2:player.weapon.range+10; // one-shot hits entire map
     for(const p of alive){
-      if(Math.hypot(p.x-player.x,p.y-player.y)<=player.weapon.range+10){
-        p.hp=Math.max(0,p.hp-player.weapon.damage);p.hitFlash=10;
+      if(Math.hypot(p.x-player.x,p.y-player.y)<=hitRange){
+        p.hp=0;p.hitFlash=10;
         spawnHitParticles(p.x,p.y,player.weapon.color);
-        hitEffects.push({x:p.x+(Math.random()-0.5)*20,y:p.y-30,dmg:player.weapon.damage,life:1});
+        if(isOneShot){
+          // explosive death burst
+          for(let i=0;i<3;i++)spawnHitParticles(p.x,p.y,'#ffffff');
+          hitEffects.push({x:p.x,y:p.y-30,dmg:'☠',life:1.5,big:true});
+        } else {
+          hitEffects.push({x:p.x+(Math.random()-0.5)*20,y:p.y-30,dmg:player.weapon.damage,life:1});
+        }
         const ddx=p.x-player.x,ddy=p.y-player.y,dd=Math.hypot(ddx,ddy)||1;
-        p.vx+=(ddx/dd)*5;p.vy+=(ddy/dd)*5;
+        p.vx+=(ddx/dd)*(isOneShot?12:5);p.vy+=(ddy/dd)*(isOneShot?12:5);
       }
     }
+    if(isOneShot)screenFlash=20;
   }
   if(attackAnim>0)attackAnim--;
 
