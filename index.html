@@ -51,7 +51,8 @@
   <div id="startScreen">
     <h1>☽ Der Kürbis-Geist ☾</h1>
     <p>Du wanderst allein durch das Dorf in der Nacht...</p>
-    <p>Plötzlich erscheint er — der weiße Kürbis-Geist.</p>
+    <p>Plötzlich erscheinen sie — die weißen Kürbis-Geister!</p>
+    <p style="color:#ff8888; font-size:13px">5 Wellen — immer mehr Kürbisse!</p>
     <div class="controls">
       <p>🎮 <b>WASD</b> oder Pfeiltasten — Bewegen</p>
       <p>⚔️ <b>LEERTASTE</b> — Angreifen (wenn Waffe ausgerüstet)</p>
@@ -83,7 +84,7 @@ const W = 800, H = 550;
 const TILE = 40;
 const COLS = Math.ceil(W / TILE) + 2;
 const ROWS = Math.ceil(H / TILE) + 2;
-const MAP_W = 30, MAP_H = 22;
+const MAP_W = 50, MAP_H = 38;
 let worldMap = [];
 
 // ── Weapon definitions ─────────────────────────────────────────────────
@@ -97,15 +98,36 @@ const WEAPON_TYPES = [
 function buildMap() {
   worldMap = [];
   for (let r = 0; r < MAP_H; r++) { worldMap[r] = []; for (let c = 0; c < MAP_W; c++) worldMap[r][c] = 0; }
-  const houses = [[1,1],[1,7],[1,14],[1,19],[8,2],[8,10],[8,17],[14,1],[14,8],[14,15],[14,21],[18,3],[18,12],[18,19]];
+  const houses = [
+    [1,1],[1,7],[1,14],[1,20],[1,28],[1,35],[1,42],
+    [6,3],[6,10],[6,18],[6,25],[6,32],[6,40],[6,46],
+    [12,1],[12,8],[12,15],[12,22],[12,30],[12,37],[12,44],
+    [18,4],[18,12],[18,19],[18,27],[18,34],[18,41],
+    [24,1],[24,9],[24,16],[24,24],[24,31],[24,38],[24,45],
+    [30,3],[30,11],[30,18],[30,26],[30,33],[30,40],
+    [34,1],[34,8],[34,15],[34,22],[34,30],[34,37],[34,44],
+  ];
   for (const [r,c] of houses)
     for (let dr = 0; dr < 3; dr++) for (let dc = 0; dc < 4; dc++)
       if (r+dr < MAP_H && c+dc < MAP_W) worldMap[r+dr][c+dc] = 1;
-  const trees = [[0,0],[0,6],[0,11],[0,17],[0,24],[0,28],[5,5],[5,13],[5,20],[5,27],[11,0],[11,6],[11,13],[11,24],[11,28],[17,0],[17,8],[17,14],[17,26],[21,2],[21,9],[21,16],[21,22],[21,27]];
+  const trees = [
+    [0,0],[0,5],[0,11],[0,17],[0,23],[0,29],[0,35],[0,41],[0,47],
+    [4,4],[4,12],[4,20],[4,28],[4,36],[4,44],
+    [9,0],[9,7],[9,14],[9,21],[9,28],[9,35],[9,42],[9,49],
+    [15,3],[15,10],[15,17],[15,24],[15,31],[15,38],[15,45],
+    [21,0],[21,6],[21,14],[21,21],[21,29],[21,36],[21,43],
+    [27,2],[27,9],[27,16],[27,23],[27,30],[27,37],[27,44],
+    [32,0],[32,7],[32,14],[32,21],[32,28],[32,35],[32,42],[32,49],
+    [36,3],[36,10],[36,17],[36,24],[36,31],[36,38],[36,45],
+  ];
   for (const [r,c] of trees) if (r < MAP_H && c < MAP_W) worldMap[r][c] = 2;
   for (let c = 0; c < MAP_W; c++) {
-    if (worldMap[6][c] === 0) worldMap[6][c] = 3;
-    if (worldMap[13][c] === 0) worldMap[13][c] = 3;
+    if (worldMap[5][c]  === 0) worldMap[5][c]  = 3;
+    if (worldMap[11][c] === 0) worldMap[11][c] = 3;
+    if (worldMap[17][c] === 0) worldMap[17][c] = 3;
+    if (worldMap[23][c] === 0) worldMap[23][c] = 3;
+    if (worldMap[29][c] === 0) worldMap[29][c] = 3;
+    if (worldMap[35][c] === 0) worldMap[35][c] = 3;
   }
 }
 
@@ -116,24 +138,48 @@ function isSolid(mx, my) {
 }
 
 // ── State ──────────────────────────────────────────────────────────────
-let player, pumpkin, keys, gameActive, startTime, particles, camX, camY;
+let player, pumpkins, keys, gameActive, startTime, particles, camX, camY;
 let flickerT = 0;
-let weaponPickups = [];   // weapons on the ground
-let hitEffects = [];      // damage flash effects
-let attackAnim = 0;       // attack animation timer
-let attackAngle = 0;      // angle of swing
-let pumpkinHitFlash = 0;  // red flash when pumpkin is hit
+let weaponPickups = [];
+let hitEffects = [];
+let attackAnim = 0;
+let attackAngle = 0;
+let wave = 0;
+let waveLabel = { text: '', timer: 0 };
+let killed = 0;
+
+function makePumpkin(x, y) {
+  return {
+    x, y, vx: 0, vy: 0,
+    wobble: Math.random()*100, appearing: true, alpha: 0,
+    flameT: 0, hornWobble: Math.random()*100,
+    hp: 100, maxHp: 100, dead: false, hitFlash: 0,
+  };
+}
+
+function spawnWave(n) {
+  wave = n;
+  waveLabel = { text: `Welle ${n} — ${n} Kürbisse!`, timer: 180 };
+  const cx = player.x, cy = player.y;
+  for (let i = 0; i < n; i++) {
+    const angle = (Math.PI*2/n)*i + Math.random()*0.5;
+    const dist = 350 + Math.random()*150;
+    pumpkins.push(makePumpkin(cx + Math.cos(angle)*dist, cy + Math.sin(angle)*dist));
+  }
+}
 
 function spawnWeapons() {
   weaponPickups = [];
   const spots = [
-    [4*TILE, 3*TILE], [22*TILE, 4*TILE], [7*TILE, 9*TILE],
-    [20*TILE, 9*TILE], [3*TILE, 16*TILE], [25*TILE, 15*TILE],
-    [12*TILE, 19*TILE], [18*TILE, 20*TILE],
+    [4,3],[12,3],[22,3],[32,3],[42,3],
+    [7,10],[17,10],[27,10],[37,10],[47,10],
+    [3,18],[13,18],[23,18],[33,18],[43,18],
+    [8,26],[18,26],[28,26],[38,26],[48,26],
+    [5,33],[15,33],[25,33],[35,33],[45,33],
   ];
   for (let i = 0; i < spots.length; i++) {
     const type = WEAPON_TYPES[i % WEAPON_TYPES.length];
-    weaponPickups.push({ x: spots[i][0], y: spots[i][1], type, bob: Math.random()*Math.PI*2 });
+    weaponPickups.push({ x: spots[i][0]*TILE, y: spots[i][1]*TILE, type, bob: Math.random()*Math.PI*2 });
   }
 }
 
@@ -143,28 +189,19 @@ function startGame() {
   document.getElementById('winScreen').style.display = 'none';
   buildMap();
   spawnWeapons();
-  player = {
-    x: 15*TILE, y: 10*TILE, facing: 1, step: 0,
-    weapon: null,       // equipped weapon
-    attackCooldown: 0,  // frames until next attack
-  };
-  pumpkin = {
-    x: player.x + 300, y: player.y - 200,
-    vx: 0, vy: 0,
-    wobble: 0, appearing: true, alpha: 0,
-    flameT: 0, hornWobble: 0,
-    hp: 100, maxHp: 100,
-    dead: false,
-  };
+  player = { x: 25*TILE, y: 19*TILE, facing: 1, step: 0, weapon: null, attackCooldown: 0 };
+  pumpkins = [];
   keys = {};
   particles = [];
   hitEffects = [];
   attackAnim = 0;
-  pumpkinHitFlash = 0;
+  wave = 0;
+  killed = 0;
   gameActive = true;
   startTime = Date.now();
   camX = player.x - W/2;
   camY = player.y - H/2;
+  spawnWave(1);
   requestAnimationFrame(loop);
 }
 
@@ -337,7 +374,7 @@ function drawPlayer(sx, sy) {
 }
 
 // ── Pumpkin drawing ────────────────────────────────────────────────────
-function drawPumpkin(t) {
+function drawPumpkin(pumpkin, t) {
   const px = pumpkin.x - camX, py = pumpkin.y - camY;
   const bob = Math.sin(pumpkin.wobble * 0.04) * 6;
   const tilt = Math.sin(pumpkin.wobble * 0.025) * 8;
@@ -349,10 +386,9 @@ function drawPumpkin(t) {
   ctx.translate(px, py + bob);
   ctx.rotate(tilt * Math.PI/180);
 
-  // hit flash tint
-  if (pumpkinHitFlash > 0) {
+  if (pumpkin.hitFlash > 0) {
     ctx.shadowColor = '#ff2222';
-    ctx.shadowBlur = 30 * (pumpkinHitFlash/10);
+    ctx.shadowBlur = 30 * (pumpkin.hitFlash/10);
   }
 
   const glowR = 60 + Math.sin(t*0.08)*10;
@@ -515,12 +551,39 @@ function drawHUD(elapsed) {
   ctx.fillStyle = '#8899cc'; ctx.font = '14px Georgia';
   ctx.fillText(`⏱ ${mins}:${s} überlebt`, 16, 28);
 
-  const dist = Math.hypot(pumpkin.x-player.x, pumpkin.y-player.y);
-  const danger = Math.max(0,1-dist/300);
+  const alive = pumpkins.filter(p=>!p.dead);
+  const minDist = alive.length ? Math.min(...alive.map(p=>Math.hypot(p.x-player.x,p.y-player.y))) : 999;
+  const danger = Math.max(0,1-minDist/300);
   ctx.fillStyle = `rgba(${Math.floor(danger*255)},0,${Math.floor((1-danger)*100)},0.7)`;
   ctx.fillRect(W-148,8,140,30);
   ctx.fillStyle = '#ccaaff'; ctx.font = '13px Georgia';
-  ctx.fillText(dist<80?'⚠ ER IST NAH!':dist<160?'👁 Er sieht dich...':'🌑 Sicher... vorerst', W-140, 28);
+  ctx.fillText(minDist<80?'⚠ SIE SIND NAH!':minDist<160?'👁 Vorsicht!':'🌑 Sicher... vorerst', W-140, 28);
+
+  // wave + kill counter
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(W/2-70,8,140,30);
+  ctx.fillStyle = '#ffcc44'; ctx.font = '14px Georgia'; ctx.textAlign='center';
+  ctx.fillText(`Welle ${wave}  💀 ${killed}`, W/2, 28);
+  ctx.textAlign='left';
+
+  // remaining pumpkins
+  if (alive.length > 0) {
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(W/2-60,44,120,22);
+    ctx.fillStyle = '#ff8888'; ctx.font = '12px Georgia'; ctx.textAlign='center';
+    ctx.fillText(`${alive.length} Kürbis${alive.length>1?'se':''} übrig`, W/2, 60);
+    ctx.textAlign='left';
+  }
+
+  // wave label
+  if (waveLabel.timer > 0) {
+    const a = Math.min(1, waveLabel.timer/30);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(W/2-140,H/2-30,280,50);
+    ctx.strokeStyle='#ffcc44'; ctx.lineWidth=1.5; ctx.strokeRect(W/2-140,H/2-30,280,50);
+    ctx.fillStyle='#ffcc44'; ctx.font='bold 20px Georgia'; ctx.textAlign='center';
+    ctx.fillText(waveLabel.text, W/2, H/2+2);
+    ctx.textAlign='left'; ctx.globalAlpha=1;
+    waveLabel.timer--;
+  }
 
   // weapon slot
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(8, H-50, 180, 42);
@@ -601,74 +664,82 @@ function loop(ts) {
 
   // attack
   if (player.attackCooldown > 0) player.attackCooldown--;
-  if ((keys[' '] || keys['Space']) && player.weapon && player.attackCooldown === 0 && !pumpkin.dead) {
-    // trigger attack
+  const alivePumpkins = pumpkins.filter(p=>!p.dead);
+  if ((keys[' '] || keys['Space']) && player.weapon && player.attackCooldown === 0 && alivePumpkins.length > 0) {
+    // aim at nearest pumpkin
+    const nearest = alivePumpkins.reduce((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)<Math.hypot(b.x-player.x,b.y-player.y)?a:b);
     attackAnim = 15;
-    attackAngle = Math.atan2(pumpkin.y - player.y, pumpkin.x - player.x);
+    attackAngle = Math.atan2(nearest.y-player.y, nearest.x-player.x);
     player.attackCooldown = player.weapon.cooldown;
-
-    // check if pumpkin is in range
-    const dist = Math.hypot(pumpkin.x-player.x, pumpkin.y-player.y);
-    if (dist <= player.weapon.range + 10) {
-      pumpkin.hp = Math.max(0, pumpkin.hp - player.weapon.damage);
-      pumpkinHitFlash = 10;
-      spawnHitParticles(pumpkin.x, pumpkin.y, player.weapon.color);
-      hitEffects.push({ x: pumpkin.x + (Math.random()-0.5)*20, y: pumpkin.y - 30, dmg: player.weapon.damage, life: 1.0 });
-      // knockback
-      const ddx = pumpkin.x-player.x, ddy = pumpkin.y-player.y;
-      const ddist = Math.hypot(ddx,ddy)||1;
-      pumpkin.vx += (ddx/ddist)*5;
-      pumpkin.vy += (ddy/ddist)*5;
+    // hit all pumpkins in range within the arc
+    for (const p of alivePumpkins) {
+      const dist = Math.hypot(p.x-player.x, p.y-player.y);
+      if (dist <= player.weapon.range + 10) {
+        p.hp = Math.max(0, p.hp - player.weapon.damage);
+        p.hitFlash = 10;
+        spawnHitParticles(p.x, p.y, player.weapon.color);
+        hitEffects.push({ x: p.x+(Math.random()-0.5)*20, y: p.y-30, dmg: player.weapon.damage, life: 1.0 });
+        const ddx=p.x-player.x, ddy=p.y-player.y, ddist=Math.hypot(ddx,ddy)||1;
+        p.vx += (ddx/ddist)*5; p.vy += (ddy/ddist)*5;
+      }
     }
   }
   if (attackAnim > 0) attackAnim--;
-  if (pumpkinHitFlash > 0) pumpkinHitFlash--;
 
   // camera
   camX += (player.x-W/2-camX)*0.1;
   camY += (player.y-H/2-camY)*0.1;
 
-  // pumpkin AI
-  pumpkin.wobble++; pumpkin.hornWobble++; pumpkin.flameT++;
-  if (pumpkin.appearing) { pumpkin.alpha=Math.min(1,pumpkin.alpha+0.008); if(pumpkin.alpha>=1)pumpkin.appearing=false; }
+  // pumpkins AI
+  const chaseSpeed = 0.9 + Math.min(3, elapsed/30000)*1.1;
+  for (const p of pumpkins) {
+    p.wobble++; p.hornWobble++; p.flameT++;
+    if (p.hitFlash > 0) p.hitFlash--;
+    if (p.appearing) { p.alpha=Math.min(1,p.alpha+0.01); if(p.alpha>=1)p.appearing=false; }
 
-  if (!pumpkin.dead) {
-    const chaseSpeed = 0.9 + Math.min(3, elapsed/30000)*1.1;
-    const pdx=player.x-pumpkin.x, pdy=player.y-pumpkin.y;
-    const pdist=Math.hypot(pdx,pdy);
-    if (pdist>5) { pumpkin.vx+=(pdx/pdist)*chaseSpeed*0.06; pumpkin.vy+=(pdy/pdist)*chaseSpeed*0.06; }
-    pumpkin.vx*=0.93; pumpkin.vy*=0.93;
-    pumpkin.vx+=(Math.random()-0.5)*0.2; pumpkin.vy+=(Math.random()-0.5)*0.2;
-    pumpkin.x+=pumpkin.vx; pumpkin.y+=pumpkin.vy;
-
-    if (flickerT%3===0) spawnFlameParticles(pumpkin.x,pumpkin.y-38);
-
-    // catch
-    if (pdist<32) {
-      gameActive=false;
-      const sc=Math.floor(elapsed/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
-      document.getElementById('surviveTime').textContent=`Du hast ${mn}:${ss} Minuten überlebt.`;
-      document.getElementById('gameOver').style.display='flex';
-    }
-    // death
-    if (pumpkin.hp<=0) {
-      pumpkin.dead=true;
-      spawnHitParticles(pumpkin.x,pumpkin.y,'#4488ff');
-      spawnHitParticles(pumpkin.x,pumpkin.y,'#ffffff');
-    }
-  } else {
-    // death animation
-    pumpkin.alpha = Math.max(0, pumpkin.alpha-0.02);
-    spawnHitParticles(pumpkin.x,pumpkin.y,'#4488ff');
-    if (pumpkin.alpha<=0) {
-      gameActive=false;
-      const sc=Math.floor(elapsed/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
-      document.getElementById('winTime').textContent=`Überlebt in ${mn}:${ss} Minuten!`;
-      document.getElementById('winScreen').style.display='flex';
+    if (!p.dead) {
+      const pdx=player.x-p.x, pdy=player.y-p.y, pdist=Math.hypot(pdx,pdy);
+      if (pdist>5) { p.vx+=(pdx/pdist)*chaseSpeed*0.06; p.vy+=(pdy/pdist)*chaseSpeed*0.06; }
+      p.vx*=0.93; p.vy*=0.93;
+      p.vx+=(Math.random()-0.5)*0.18; p.vy+=(Math.random()-0.5)*0.18;
+      p.x+=p.vx; p.y+=p.vy;
+      if (flickerT%3===0) spawnFlameParticles(p.x,p.y-38);
+      // catch player
+      if (pdist<32) {
+        gameActive=false;
+        const sc=Math.floor(elapsed/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
+        document.getElementById('surviveTime').textContent=`Du hast ${mn}:${ss} Minuten überlebt. (Welle ${wave}, ${killed} Kürbisse getötet)`;
+        document.getElementById('gameOver').style.display='flex';
+        return;
+      }
+      if (p.hp<=0) {
+        p.dead=true; killed++;
+        spawnHitParticles(p.x,p.y,'#4488ff'); spawnHitParticles(p.x,p.y,'#ffffff');
+      }
+    } else {
+      p.alpha=Math.max(0,p.alpha-0.025);
     }
   }
 
-  // update particles
+  // remove fully faded dead pumpkins
+  for (let i=pumpkins.length-1;i>=0;i--) { if(pumpkins[i].dead&&pumpkins[i].alpha<=0) pumpkins.splice(i,1); }
+
+  // next wave when all dead
+  const remaining = pumpkins.filter(p=>!p.dead);
+  if (remaining.length === 0 && pumpkins.every(p=>p.alpha<=0)) {
+    const nextWave = wave + 1;
+    if (nextWave > 5) {
+      // win!
+      gameActive=false;
+      const sc=Math.floor(elapsed/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
+      document.getElementById('winTime').textContent=`Alle 5 Wellen in ${mn}:${ss} besiegt! 💀 ${killed} Kürbisse getötet.`;
+      document.getElementById('winScreen').style.display='flex';
+      return;
+    }
+    spawnWave(nextWave);
+  }
+
+  // particles
   for (const p of particles) { p.x+=p.vx; p.y+=p.vy; p.life-=0.025; }
   for (let i=particles.length-1;i>=0;i--) if(particles[i].life<=0)particles.splice(i,1);
   for (const e of hitEffects) { e.y-=1; e.life-=0.04; }
@@ -681,7 +752,7 @@ function loop(ts) {
   drawParticles();
   drawAttackArc();
   drawPlayer(player.x-camX, player.y-camY);
-  if (!pumpkin.dead || pumpkin.alpha>0) drawPumpkin(flickerT);
+  for (const p of pumpkins) { if (!p.dead || p.alpha>0) drawPumpkin(p, flickerT); }
   drawNightOverlay();
   drawHUD(elapsed);
 
