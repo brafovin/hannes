@@ -56,6 +56,7 @@
       <p>🎮 <b>WASD</b> / Pfeiltasten — Bewegen</p>
       <p>⚔️ <b>LEERTASTE</b> — Angreifen</p>
       <p>🗡️ Laufe über Waffen um sie aufzuheben</p>
+      <p>❤️ Du hast 3 Leben — pass auf die Kürbisse auf!</p>
     </div>
     <div class="btn btn-blue" id="startBtn">SPIEL STARTEN</div>
   </div>
@@ -261,7 +262,7 @@
     wave = n;
     waveKills = 0;
     biome = generateBiome(n);
-    const count = Math.min(8, 1 + Math.floor((n - 1) / 8)); // 1 pumpkin, +1 every 8 waves, cap 8
+    const count = Math.min(16, 1 + Math.floor((n - 1) / 5)); // 1 pumpkin, +1 every 5 waves, cap 16
     const hp = 80 + n * 6;
     waveBanner = { text: biome.emoji + ' Welle ' + n + '/' + MAX_WAVE + ' · ' + biome.name, timer: 150 };
     for (let i = 0; i < count; i++) {
@@ -399,6 +400,8 @@
 
   // ── Drawing: player ────────────────────────────────────────────────
   function drawPlayer() {
+    // blink while invincible
+    if (player.inv > 0 && Math.floor(player.inv / 5) % 2 === 0) return;
     const sx = player.x - camX, sy = player.y - camY;
     const t = player.step;
     const bob = Math.sin(t * 0.25) * 2;
@@ -610,6 +613,13 @@
     ctx.fillStyle = '#8899cc'; ctx.font = '14px Georgia'; ctx.textAlign = 'left';
     ctx.fillText('⏱ ' + mins + ':' + s, 16, 27);
 
+    // hearts (player HP)
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(8, 40, 30 + player.maxHp * 22, 28);
+    ctx.font = '18px Georgia';
+    for (let i = 0; i < player.maxHp; i++) {
+      ctx.fillText(i < player.hp ? '❤️' : '🖤', 14 + i * 22, 60);
+    }
+
     // danger
     const alive = pumpkins.filter(p => !p.dead);
     let minD = 9999;
@@ -695,7 +705,7 @@
     document.getElementById('winScreen').classList.remove('show');
     buildMap();
     const sp = findSpawn();
-    player = { x: sp.x, y: sp.y, facing: 1, step: 0, weapon: null, cd: 0 };
+    player = { x: sp.x, y: sp.y, facing: 1, step: 0, weapon: null, cd: 0, hp: 3, maxHp: 3, inv: 0 };
     pumpkins = []; particles = []; hitTexts = []; ambientP = [];
     spawnWeapons();
     keys = {};
@@ -762,6 +772,8 @@
       }
     }
 
+    if (player.inv > 0) player.inv--;
+
     // attack
     if (player.cd > 0) player.cd--;
     const alive = pumpkins.filter(p => !p.dead);
@@ -800,7 +812,7 @@
     camY += (player.y - H/2 - camY) * 0.12;
 
     // pumpkins
-    const chase = 0.85 + Math.min(2.5, wave / 40) * 1.0;
+    const chase = 0.9 + Math.min(3.2, wave / 25) * 1.0;
     for (const p of pumpkins) {
       p.wob++; p.horn++; if (p.flash > 0) p.flash--;
       if (p.appearing) { p.alpha += 0.015; if (p.alpha >= 1) { p.alpha = 1; p.appearing = false; } }
@@ -813,7 +825,15 @@
         p.x = Math.max(20, Math.min(MAP_W*TILE-20, p.x));
         p.y = Math.max(20, Math.min(MAP_H*TILE-20, p.y));
         if (frame % 4 === 0) flameParticles(p.x, p.y - 36);
-        if (d < 30) { endGame(false); return; }
+        if (d < 30 && player.inv === 0) {
+          player.hp--;
+          player.inv = 60; // ~1s invincibility
+          hitParticles(player.x, player.y, '#ff4444');
+          // knock the pumpkin back so it doesn't drain all hearts at once
+          const a = Math.atan2(p.y - player.y, p.x - player.x);
+          p.vx += Math.cos(a) * 8; p.vy += Math.sin(a) * 8;
+          if (player.hp <= 0) { endGame(false); return; }
+        }
         if (p.hp <= 0) {
           p.dead = true; totalKills++; waveKills++;
           hitParticles(p.x, p.y, biome.pumpkinColor);
