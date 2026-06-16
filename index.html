@@ -41,7 +41,7 @@
   <div id="startScreen" class="overlay-screen">
     <h1>☽ Der Kürbis-Geist ☾</h1>
     <p>Du wanderst allein durch das Dorf in der Nacht...</p>
-    <p style="color:#ff8888;font-size:13px">1000 Wellen · 1000 Biome · Unendlicher Wahnsinn!</p>
+    <p style="color:#ff8888;font-size:13px">200 Wellen · 200 Biome!</p>
     <div style="display:flex;gap:16px;margin-top:12px">
       <div style="text-align:center;color:#aa8833;font-size:20px">🍂</div>
       <div style="text-align:center;color:#aaccff;font-size:20px">❄️</div>
@@ -67,12 +67,12 @@
 
   <div id="winScreen" class="overlay-screen">
     <h1>🏆 LEGENDE! 🏆</h1>
-    <p>Du hast alle 1000 Wellen und 1000 Biome überlebt!</p>
+    <p>Du hast alle 200 Wellen und 200 Biome überlebt!</p>
     <p id="winTime" style="color:#ffcc44;font-size:17px;margin-top:8px"></p>
     <button class="btn btn-green" onclick="startGame()" style="margin-top:18px">NOCHMAL SPIELEN</button>
   </div>
 </div>
-<div id="ui">WASD bewegen · LEERTASTE angreifen · 1000 Biome · 1000 Wellen!</div>
+<div id="ui">WASD bewegen · LEERTASTE angreifen · 200 Biome · 200 Wellen!</div>
 
 <script>
 const canvas = document.getElementById('c');
@@ -184,7 +184,7 @@ function spawnWave(wn) {
   const count = Math.min(30, Math.ceil(wave * 0.5));
   const hp = 100 + wave * 5;
   biome = generateBiome(wave);
-  waveLabel={text:`${biome.emoji} Welle ${wave}/1000 · ${count} Kürbisse — ${biome.name}`,timer:200};
+  waveLabel={text:`${biome.emoji} Welle ${wave}/200 · ${count} Kürbisse — ${biome.name}`,timer:200};
   const cx=player.x,cy=player.y;
   for(let i=0;i<count;i++){
     const angle=(Math.PI*2/count)*i+0.3*(i%3);
@@ -443,7 +443,7 @@ function drawBiomeBar(){
   ctx.fillStyle=fillColor;ctx.fillRect(barX,barY,barW*prog,barH);
   ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.strokeRect(barX,barY,barW,barH);
   ctx.fillStyle='#ccddee';ctx.font='11px Georgia';ctx.textAlign='center';
-  ctx.fillText(`${biome.emoji} Welle ${wave} / 1000`,barX+barW/2,barY+15);
+  ctx.fillText(`${biome.emoji} Welle ${wave} / 200`,barX+barW/2,barY+15);
   ctx.textAlign='left';
 
   // wave progress bar (left side) — kill counter
@@ -628,7 +628,7 @@ function loop(ts){
   const remaining=pumpkins.filter(p=>!p.dead);
   if(remaining.length===0&&pumpkins.every(p=>p.alpha<=0)){
     const nextWave=wave+1;
-    if(nextWave>1000){
+    if(nextWave>200){
       // full win
       gameActive=false;
       const sc=Math.floor((Date.now()-startTime)/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
