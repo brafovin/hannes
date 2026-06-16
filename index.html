@@ -2,670 +2,888 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Der Kürbis-Geist</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Georgia', serif; }
-  canvas { border: 2px solid #1a0a2e; display: block; outline: none; }
-  #ui { color: #8888cc; text-align: center; margin-top: 8px; font-size: 13px; letter-spacing: 1px; }
-  .overlay-screen {
-    position: absolute; display: none; flex-direction: column; align-items: center; justify-content: center;
-    width: 800px; height: 550px;
+  html, body { background: #000; height: 100%; }
+  body {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; font-family: 'Georgia', serif;
   }
-  #startScreen { display: flex; background: rgba(0,0,0,0.93); }
-  #startScreen h1 { font-size: 36px; color: #aaa9ff; text-shadow: 0 0 20px #6666ff; margin-bottom: 10px; }
-  #startScreen p { font-size: 14px; color: #9999bb; margin-bottom: 5px; }
-  .controls { margin-top:12px; background:#0a0a1a; padding:10px 22px; border:1px solid #333; }
-  .controls p { color:#7788aa; font-size:12px; margin-bottom:3px; }
-  .btn { margin-top: 18px; padding: 11px 32px; font-size: 17px; cursor: pointer; letter-spacing: 2px; transition: all 0.2s; border: 2px solid; }
-  .btn-blue { background:#1a0a2e; color:#aaa9ff; border-color:#6644aa; }
-  .btn-blue:hover { background:#2a1a4e; box-shadow:0 0 20px #6644aa; }
-  .btn-red { background:#1a0000; color:#ff8888; border-color:#aa2222; }
-  .btn-red:hover { background:#2a0000; box-shadow:0 0 20px #aa2222; }
-  .btn-green { background:#001a00; color:#88ffaa; border-color:#22aa44; }
-  .btn-green:hover { background:#002a00; box-shadow:0 0 20px #22aa44; }
-  .btn-purple { background:#10002a; color:#dd88ff; border-color:#8822cc; }
-  .btn-purple:hover { background:#200040; box-shadow:0 0 20px #8822cc; }
-  #gameOver { background:rgba(0,0,0,0.88); }
+  #wrap { position: relative; }
+  canvas { border: 2px solid #1a0a2e; display: block; outline: none; background: #050505; }
+  #ui { color: #8888cc; text-align: center; margin-top: 8px; font-size: 13px; letter-spacing: 1px; }
+  .screen {
+    position: absolute; inset: 0; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 20px;
+  }
+  .screen.show { display: flex; }
+  #startScreen { background: rgba(2,2,12,0.94); }
+  #startScreen h1 { font-size: 38px; color: #aaa9ff; text-shadow: 0 0 20px #6666ff; margin-bottom: 12px; }
+  #startScreen p { font-size: 14px; color: #9999bb; margin-bottom: 6px; }
+  .controls { margin-top: 14px; background: #0a0a1a; padding: 12px 24px; border: 1px solid #333; }
+  .controls p { color: #7788aa; font-size: 13px; margin-bottom: 4px; }
+  .btn {
+    margin-top: 20px; padding: 12px 36px; font-size: 18px; cursor: pointer;
+    letter-spacing: 2px; border: 2px solid; transition: all 0.15s; user-select: none;
+  }
+  .btn-blue  { background: #1a0a2e; color: #aaa9ff; border-color: #6644aa; }
+  .btn-blue:hover  { background: #2a1a4e; box-shadow: 0 0 20px #6644aa; }
+  .btn-red   { background: #1a0000; color: #ff8888; border-color: #aa2222; }
+  .btn-red:hover   { background: #2a0000; box-shadow: 0 0 20px #aa2222; }
+  .btn-green { background: #001a00; color: #88ffaa; border-color: #22aa44; }
+  .btn-green:hover { background: #002a00; box-shadow: 0 0 20px #22aa44; }
+  #gameOver { background: rgba(0,0,0,0.88); }
   #gameOver h1 { font-size: 50px; color: #ff4444; text-shadow: 0 0 30px #ff0000; margin-bottom: 14px; }
   #gameOver p { font-size: 15px; color: #cc9999; margin-bottom: 6px; }
-  #winScreen { background:rgba(0,0,0,0.92); }
+  #winScreen { background: rgba(0,0,0,0.92); }
   #winScreen h1 { font-size: 46px; color: #ffdd44; text-shadow: 0 0 30px #ffaa00; margin-bottom: 14px; }
   #winScreen p { font-size: 15px; color: #ddcc88; margin-bottom: 6px; }
 </style>
 </head>
 <body>
-<div style="position:relative">
+<div id="wrap">
   <canvas id="c" width="800" height="550" tabindex="0"></canvas>
 
-  <div id="startScreen" class="overlay-screen">
+  <div id="startScreen" class="screen show">
     <h1>☽ Der Kürbis-Geist ☾</h1>
     <p>Du wanderst allein durch das Dorf in der Nacht...</p>
-    <p style="color:#ff8888;font-size:13px">100 Wellen · 100 Biome!</p>
-    <div style="display:flex;gap:16px;margin-top:12px">
-      <div style="text-align:center;color:#aa8833;font-size:20px">🍂</div>
-      <div style="text-align:center;color:#aaccff;font-size:20px">❄️</div>
-      <div style="text-align:center;color:#88ff88;font-size:20px">💀</div>
-      <div style="text-align:center;color:#ff6600;font-size:20px">🌋</div>
-      <div style="text-align:center;color:#dd88ff;font-size:20px">👻</div>
-    </div>
+    <p>Plötzlich erscheinen die weißen Kürbis-Geister!</p>
+    <p style="color:#ff8888; font-size:13px; margin-top:6px">100 Wellen · 100 Biome · überlebe!</p>
     <div class="controls">
       <p>🎮 <b>WASD</b> / Pfeiltasten — Bewegen</p>
       <p>⚔️ <b>LEERTASTE</b> — Angreifen</p>
       <p>🗡️ Laufe über Waffen um sie aufzuheben</p>
     </div>
-    <button class="btn btn-blue" onclick="startGame()">SPIEL STARTEN</button>
+    <div class="btn btn-blue" id="startBtn">SPIEL STARTEN</div>
   </div>
 
-  <div id="gameOver" class="overlay-screen">
+  <div id="gameOver" class="screen">
     <h1>☠ ERWISCHT ☠</h1>
     <p>Der Kürbis-Geist hat dich eingeholt...</p>
-    <p id="goStage" style="color:#ffaa88;font-size:15px;margin-top:6px"></p>
-    <p id="goTime" style="color:#ffaa88;font-size:15px"></p>
-    <button class="btn btn-red" onclick="startGame()" style="margin-top:18px">NOCHMAL VERSUCHEN</button>
+    <p id="goInfo" style="color:#ffaa88; font-size:16px; margin-top:8px"></p>
+    <div class="btn btn-red" id="retryBtn">NOCHMAL VERSUCHEN</div>
   </div>
 
-  <div id="winScreen" class="overlay-screen">
+  <div id="winScreen" class="screen">
     <h1>🏆 LEGENDE! 🏆</h1>
-    <p>Du hast alle 100 Wellen und 100 Biome überlebt!</p>
-    <p id="winTime" style="color:#ffcc44;font-size:17px;margin-top:8px"></p>
-    <button class="btn btn-green" onclick="startGame()" style="margin-top:18px">NOCHMAL SPIELEN</button>
+    <p>Du hast alle 100 Wellen überlebt!</p>
+    <p id="winInfo" style="color:#ffcc44; font-size:17px; margin-top:8px"></p>
+    <div class="btn btn-green" id="playAgainBtn">NOCHMAL SPIELEN</div>
   </div>
 </div>
-<div id="ui">WASD bewegen · LEERTASTE angreifen · 100 Biome · 100 Wellen!</div>
+<div id="ui">WASD bewegen · LEERTASTE angreifen · Waffen aufsammeln</div>
 
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const W = 800, H = 550;
-const TILE = 40;
-const COLS = Math.ceil(W/TILE)+2, ROWS = Math.ceil(H/TILE)+2;
-const MAP_W = 50, MAP_H = 38;
+"use strict";
+(function () {
+  // ── Setup ──────────────────────────────────────────────────────────
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const W = 800, H = 550;
+  const TILE = 40;
+  const MAP_W = 50, MAP_H = 38;
+  const MAX_WAVE = 100;
 
-// ── Procedural biome generator ─────────────────────────────────────────
-const BIOME_PREFIXES = ['Neon','Kristall','Schatten','Feuer','Eis','Gift','Blut','Sturm','Nebel','Staub','Asche','Geister','Lava','Frost','Donner'];
-const BIOME_SUFFIXES = ['Dorf','Wald','Reich','Welt','Land','Höhle','Turm','Sumpf','Tal','Ebene'];
-const BIOME_EMOJIS = ['🍂','❄️','💀','🌋','👻','🌿','🔥','🌊','⚡','🌑','🩸','💎','🕸️','🌺','☁️','🦇','🐍','🌙','✨','🗡️','🌪️','🧿'];
-const AMBIENT_CYCLE = ['snow','ember','spirit',null,'rain','dust'];
+  // ── Biome generation ───────────────────────────────────────────────
+  const PREFIXES = ['Neon','Kristall','Schatten','Feuer','Eis','Gift','Blut','Sturm','Nebel','Staub','Asche','Geister','Lava','Frost','Donner'];
+  const SUFFIXES = ['Dorf','Wald','Reich','Welt','Land','Höhle','Turm','Sumpf','Tal','Ebene'];
+  const EMOJIS = ['🍂','❄️','💀','🌋','👻','🌙','⚡','🔥','🌲','🦴','🕷️','🌑','💧','🪦','🌀','🩸','☠️','🌫️','✨','🦇','🐍','🕸️'];
+  const AMBIENT = ['snow','ember','spirit',null,'rain','dust'];
 
-function hsl(h,s,l){ return `hsl(${Math.round(h)},${s}%,${l}%)`; }
-function hslA(h,s,l,a){ return `hsla(${Math.round(h)},${s}%,${l}%,${a})`; }
+  function hsl(h, s, l) { return 'hsl(' + ((h % 360 + 360) % 360) + ',' + s + '%,' + l + '%)'; }
+  function hslA(h, s, l, a) { return 'hsla(' + ((h % 360 + 360) % 360) + ',' + s + '%,' + l + '%,' + a + ')'; }
 
-// Convert HSL to approximate RGB integers for overlay
-function hslToRgb(h,s,l){
-  s/=100; l/=100;
-  const k=i=>(i+h/30)%12;
-  const a=s*Math.min(l,1-l);
-  const f=i=>l-a*Math.max(-1,Math.min(k(i)-3,Math.min(9-k(i),1)));
-  return [Math.round(f(0)*255),Math.round(f(8)*255),Math.round(f(4)*255)];
-}
-
-function generateBiome(n) {
-  const hue = (n * 137.5) % 360;
-  const compHue = (hue + 180) % 360;
-  const pumpkinHue = (hue + 60) % 360;
-  const [or,og,ob] = hslToRgb(hue, 60, 8);
-
-  const prefix = BIOME_PREFIXES[n % BIOME_PREFIXES.length];
-  const suffix = BIOME_SUFFIXES[Math.floor(n / BIOME_PREFIXES.length) % BIOME_SUFFIXES.length];
-  const name = prefix + '-' + suffix;
-  const emoji = BIOME_EMOJIS[n % BIOME_EMOJIS.length];
-  const ambientParticle = AMBIENT_CYCLE[n % AMBIENT_CYCLE.length];
-
-  return {
-    name,
-    emoji,
-    hue,
-    bg: hsl(hue, 40, 3),
-    ground: hsl(hue, 20, 12),
-    groundAlt: hsl(hue, 22, 16),
-    groundLine: hsl(hue, 18, 8),
-    house: hsl(hue, 25, 18),
-    houseWall: hsl(hue, 28, 26),
-    houseWin: hsl(compHue, 80, 70),
-    houseWinGlow: hsl(compHue, 90, 55),
-    tree: hsl((hue + 120) % 360, 40, 10),
-    treeTop: hsl((hue + 120) % 360, 45, 7),
-    treeHL: hslA((hue + 100) % 360, 50, 30, 0.4),
-    fence: hsl(hue, 22, 24),
-    overlayR: or,
-    overlayG: og,
-    overlayB: ob,
-    overlayA: 0.68,
-    pumpkinHue: hsl(pumpkinHue, 80, 55),
-    ambientParticle,
-  };
-}
-
-// ── Weapon definitions ─────────────────────────────────────────────────
-const WEAPON_TYPES = [
-  { id:'sword',  name:'Schwert',    damage:25, range:55, cooldown:40, color:'#aaddff', icon:'🗡️' },
-  { id:'axe',    name:'Axt',        damage:40, range:45, cooldown:65, color:'#ffaa44', icon:'🪓' },
-  { id:'staff',  name:'Zauberstab', damage:18, range:90, cooldown:30, color:'#dd88ff', icon:'🪄' },
-  { id:'hammer', name:'Hammer',     damage:55, range:40, cooldown:80, color:'#ff8844', icon:'🔨' },
-  { id:'oneshot', name:'HEILIGE SENSE', damage:99999, range:120, cooldown:0, color:'#ffffff', icon:'☠️', oneshot:true },
-];
-
-let worldMap=[], player, pumpkins=[], keys={}, gameActive=false, loopId=0;
-let startTime, particles=[], camX=0, camY=0, flickerT=0;
-let weaponPickups=[], hitEffects=[], attackAnim=0, attackAngle=0;
-let wave=0, killed=0, totalKilled=0, screenFlash=0;
-let waveLabel={text:'',timer:0};
-let ambientParticles=[];
-let biome = generateBiome(1);
-
-// ── Map ────────────────────────────────────────────────────────────────
-function buildMap() {
-  worldMap=[];
-  for(let r=0;r<MAP_H;r++){worldMap[r]=[];for(let c=0;c<MAP_W;c++)worldMap[r][c]=0;}
-  const houses=[[1,1],[1,7],[1,14],[1,20],[1,28],[1,35],[1,42],[6,3],[6,10],[6,18],[6,25],[6,32],[6,40],[6,46],[12,1],[12,8],[12,15],[12,22],[12,30],[12,37],[12,44],[18,4],[18,12],[18,19],[18,27],[18,34],[18,41],[24,1],[24,9],[24,16],[24,24],[24,31],[24,38],[24,45],[30,3],[30,11],[30,18],[30,26],[30,33],[30,40],[34,1],[34,8],[34,15],[34,22],[34,30],[34,37],[34,44]];
-  for(const[r,c]of houses)for(let dr=0;dr<3;dr++)for(let dc=0;dc<4;dc++)if(r+dr<MAP_H&&c+dc<MAP_W)worldMap[r+dr][c+dc]=1;
-  const trees=[[0,0],[0,5],[0,11],[0,17],[0,23],[0,29],[0,35],[0,41],[0,47],[4,4],[4,12],[4,20],[4,28],[4,36],[4,44],[9,0],[9,7],[9,14],[9,21],[9,28],[9,35],[9,42],[9,49],[15,3],[15,10],[15,17],[15,24],[15,31],[15,38],[15,45],[21,0],[21,6],[21,14],[21,21],[21,29],[21,36],[21,43],[27,2],[27,9],[27,16],[27,23],[27,30],[27,37],[27,44],[32,0],[32,7],[32,14],[32,21],[32,28],[32,35],[32,42],[32,49],[36,3],[36,10],[36,17],[36,24],[36,31],[36,38],[36,45]];
-  for(const[r,c]of trees)if(r<MAP_H&&c<MAP_W)worldMap[r][c]=2;
-  for(let c=0;c<MAP_W;c++){[5,11,17,23,29,35].forEach(row=>{if(worldMap[row][c]===0)worldMap[row][c]=3;});}
-}
-
-function isSolid(mx,my){const c=Math.floor(mx/TILE),r=Math.floor(my/TILE);if(r<0||r>=MAP_H||c<0||c>=MAP_W)return true;return worldMap[r][c]===1||worldMap[r][c]===2;}
-
-// ── Weapons spawn ──────────────────────────────────────────────────────
-function spawnWeapons() {
-  weaponPickups=[];
-  const spots=[[4,3],[12,3],[22,3],[32,3],[42,3],[7,10],[17,10],[27,10],[37,10],[47,10],[3,18],[13,18],[23,18],[33,18],[43,18],[8,26],[18,26],[28,26],[38,26],[48,26],[5,33],[15,33],[25,33],[35,33],[45,33]];
-  for(let i=0;i<spots.length;i++){const type=WEAPON_TYPES[i%4];weaponPickups.push({x:spots[i][0]*TILE,y:spots[i][1]*TILE,type,bob:Math.random()*Math.PI*2});}
-  // one-shot scythe — rare, center of map
-  weaponPickups.push({x:25*TILE,y:19*TILE,type:WEAPON_TYPES[4],bob:0,rare:true});
-}
-
-// ── Pumpkins ───────────────────────────────────────────────────────────
-function makePumpkin(x,y,hp){return{x,y,vx:0,vy:0,wobble:Math.random()*100,appearing:true,alpha:0,flameT:0,hornWobble:Math.random()*100,hp,maxHp:hp,dead:false,hitFlash:0};}
-
-function spawnWave(wn) {
-  wave=wn;
-  const count = Math.min(10, 1 + Math.floor(wave / 10));
-  const hp = 100 + wave * 5;
-  biome = generateBiome(wave);
-  waveLabel={text:`${biome.emoji} Welle ${wave}/100 · ${count} Kürbisse — ${biome.name}`,timer:200};
-  const cx=player.x,cy=player.y;
-  for(let i=0;i<count;i++){
-    const angle=(Math.PI*2/count)*i+0.3*(i%3);
-    const dist=350+((i*73)%150);
-    pumpkins.push(makePumpkin(cx+Math.cos(angle)*dist,cy+Math.sin(angle)*dist,hp));
+  // HSL -> RGB ints (for overlay gradient)
+  function hslToRgb(h, s, l) {
+    h = ((h % 360) + 360) % 360;
+    s /= 100; l /= 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = l - c / 2;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; }
+    else if (h < 120) { r = x; g = c; }
+    else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; }
+    else if (h < 300) { r = x; b = c; }
+    else { r = c; b = x; }
+    return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
   }
-}
 
-// ── Ambient particles ──────────────────────────────────────────────────
-function updateAmbient() {
-  const type=biome.ambientParticle;
-  if(!type)return;
-  if(type==='snow'&&Math.random()<0.3){
-    ambientParticles.push({x:camX+Math.random()*W,y:camY,vx:(Math.random()-0.5)*0.3,vy:0.8+Math.random()*0.5,life:1,type:'snow'});
-  } else if(type==='ember'&&Math.random()<0.15){
-    ambientParticles.push({x:camX+Math.random()*W,y:camY+H,vx:(Math.random()-0.5)*0.5,vy:-1-Math.random()*1.5,life:1,type:'ember'});
-  } else if(type==='spirit'&&Math.random()<0.08){
-    ambientParticles.push({x:camX+Math.random()*W,y:camY+Math.random()*H,vx:(Math.random()-0.5)*0.4,vy:-0.3-Math.random()*0.3,life:1,type:'spirit'});
-  } else if(type==='rain'&&Math.random()<0.5){
-    ambientParticles.push({x:camX+Math.random()*W,y:camY,vx:-0.5+Math.random()*0.3,vy:6+Math.random()*4,life:1,type:'rain'});
-  } else if(type==='dust'&&Math.random()<0.12){
-    ambientParticles.push({x:camX+Math.random()*W,y:camY+Math.random()*H,vx:(Math.random()-0.5)*0.6,vy:(Math.random()-0.5)*0.3,life:1,type:'dust'});
+  function generateBiome(waveNum) {
+    const hue = (waveNum * 137.5) % 360;
+    const compHue = (hue + 180) % 360;
+    const pumpHue = (hue + 60) % 360;
+    const treeHue = (hue + 120) % 360;
+    const rgb = hslToRgb(hue, 50, 6);
+    const prefix = PREFIXES[(waveNum - 1) % PREFIXES.length];
+    const suffix = SUFFIXES[Math.floor((waveNum - 1) / PREFIXES.length) % SUFFIXES.length];
+    return {
+      name: prefix + '-' + suffix,
+      emoji: EMOJIS[(waveNum - 1) % EMOJIS.length],
+      hue: hue,
+      bg: hsl(hue, 40, 4),
+      ground: hsl(hue, 18, 13),
+      groundAlt: hsl(hue, 20, 17),
+      groundLine: hsl(hue, 16, 8),
+      house: hsl(hue, 24, 19),
+      houseWall: hsl(hue, 28, 27),
+      houseWin: hsl(compHue, 80, 70),
+      houseWinGlow: hsl(compHue, 90, 55),
+      tree: hsl(treeHue, 38, 11),
+      treeTop: hsl(treeHue, 42, 8),
+      treeHL: hslA(treeHue + 20, 50, 30, 0.4),
+      fence: hsl(hue, 22, 25),
+      overlayR: rgb[0], overlayG: rgb[1], overlayB: rgb[2], overlayA: 0.66,
+      pumpkinHue: pumpHue,
+      pumpkinColor: hsl(pumpHue, 85, 65),
+      ambient: AMBIENT[(waveNum - 1) % AMBIENT.length],
+    };
   }
-  for(const p of ambientParticles){p.x+=p.vx;p.y+=p.vy;p.life-=0.008;}
-  for(let i=ambientParticles.length-1;i>=0;i--)if(ambientParticles[i].life<=0)ambientParticles.splice(i,1);
-}
 
-function drawAmbient() {
-  for(const p of ambientParticles){
-    const sx=p.x-camX,sy=p.y-camY;
-    ctx.globalAlpha=p.life*0.7;
-    if(p.type==='snow'){ctx.fillStyle='#ddeeff';ctx.beginPath();ctx.arc(sx,sy,2,0,Math.PI*2);ctx.fill();}
-    else if(p.type==='ember'){ctx.fillStyle=`hsl(${20+Math.random()*20},100%,${50+p.life*30}%)`;ctx.shadowColor='#ff4400';ctx.shadowBlur=6;ctx.beginPath();ctx.arc(sx,sy,2,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
-    else if(p.type==='spirit'){const g=ctx.createRadialGradient(sx,sy,0,sx,sy,8);g.addColorStop(0,'rgba(180,80,255,0.6)');g.addColorStop(1,'rgba(80,0,180,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(sx,sy,8,0,Math.PI*2);ctx.fill();}
-    else if(p.type==='rain'){ctx.strokeStyle='rgba(140,160,210,0.6)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+p.vx*3,sy+p.vy*3);ctx.stroke();}
-    else if(p.type==='dust'){const sz=2+p.life*3;ctx.fillStyle=`rgba(160,120,70,${p.life*0.4})`;ctx.beginPath();ctx.arc(sx,sy,sz,0,Math.PI*2);ctx.fill();}
-  }
-  ctx.globalAlpha=1;ctx.shadowBlur=0;
-}
+  // ── Weapons ────────────────────────────────────────────────────────
+  const WEAPONS = [
+    { id:'sword',  name:'Schwert',       damage:25,    range:60,  cooldown:25, color:'#aaddff', icon:'🗡️' },
+    { id:'axe',    name:'Axt',           damage:40,    range:50,  cooldown:45, color:'#ffaa44', icon:'🪓' },
+    { id:'staff',  name:'Zauberstab',    damage:18,    range:100, cooldown:20, color:'#dd88ff', icon:'🪄' },
+    { id:'hammer', name:'Hammer',        damage:60,    range:45,  cooldown:55, color:'#ff8844', icon:'🔨' },
+    { id:'scythe', name:'HEILIGE SENSE', damage:99999, range:9999, cooldown:0, color:'#ffffff', icon:'☠️', oneshot:true },
+  ];
 
-// ── Tile drawing ───────────────────────────────────────────────────────
-function drawTile(type,sx,sy) {
-  const b=biome;
-  if(type===0){
-    ctx.fillStyle=b.ground;ctx.fillRect(sx,sy,TILE,TILE);
-    ctx.fillStyle=b.groundAlt;
-    ctx.fillRect(sx+2,sy+2,17,17);ctx.fillRect(sx+21,sy+21,17,17);ctx.fillRect(sx+2,sy+22,17,15);ctx.fillRect(sx+21,sy+2,17,17);
-    ctx.strokeStyle=b.groundLine;ctx.lineWidth=0.5;
-    ctx.strokeRect(sx+2,sy+2,17,17);ctx.strokeRect(sx+21,sy+21,17,17);ctx.strokeRect(sx+2,sy+22,17,15);ctx.strokeRect(sx+21,sy+2,17,17);
-  } else if(type===1){
-    ctx.fillStyle=b.house;ctx.fillRect(sx,sy,TILE,TILE);
-    ctx.fillStyle=b.houseWall;ctx.fillRect(sx+2,sy+2,TILE-4,TILE-4);
-    ctx.fillStyle=b.houseWin;ctx.shadowColor=b.houseWinGlow;ctx.shadowBlur=6;ctx.fillRect(sx+8,sy+10,10,8);ctx.shadowBlur=0;
-    ctx.strokeStyle=b.house;ctx.lineWidth=1;ctx.strokeRect(sx+8,sy+10,10,8);
-  } else if(type===2){
-    ctx.fillStyle=b.house;ctx.fillRect(sx+17,sy+24,6,16);
-    ctx.fillStyle=b.tree;ctx.beginPath();ctx.arc(sx+20,sy+16,16,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle=b.treeTop;ctx.beginPath();ctx.arc(sx+20,sy+8,12,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle=b.treeHL;ctx.beginPath();ctx.arc(sx+16,sy+14,6,0,Math.PI*2);ctx.fill();
-  } else if(type===3){
-    ctx.fillStyle=b.ground;ctx.fillRect(sx,sy,TILE,TILE);
-    ctx.fillStyle=b.fence;
-    ctx.fillRect(sx+2,sy+14,TILE-4,4);ctx.fillRect(sx+2,sy+22,TILE-4,4);
-    for(let i=4;i<TILE-4;i+=8)ctx.fillRect(sx+i,sy+8,4,24);
-  }
-}
+  // ── State ──────────────────────────────────────────────────────────
+  let map = [];
+  let player, pumpkins, weapons, particles, hitTexts, ambientP;
+  let keys = {};
+  let camX = 0, camY = 0;
+  let wave = 0, totalKills = 0, waveKills = 0;
+  let biome = generateBiome(1);
+  let waveBanner = { text: '', timer: 0 };
+  let screenFlash = 0;
+  let attackFx = 0, attackAngle = 0;
+  let frame = 0;
+  let running = false;
+  let rafId = 0;
+  let startTime = 0;
 
-function drawWorld(){
-  const startC=Math.floor(camX/TILE)-1,startR=Math.floor(camY/TILE)-1;
-  for(let r=startR;r<startR+ROWS+2;r++)for(let c=startC;c<startC+COLS+2;c++){
-    const sx=c*TILE-camX,sy=r*TILE-camY;
-    if(r<0||r>=MAP_H||c<0||c>=MAP_W){ctx.fillStyle=biome.bg;ctx.fillRect(sx,sy,TILE,TILE);}
-    else drawTile(worldMap[r][c],sx,sy);
-  }
-}
-
-// ── Weapon pickups ─────────────────────────────────────────────────────
-function drawWeaponShape(type,ox,oy,scale){
-  ctx.save();ctx.scale(scale,scale);
-  if(type.id==='sword'){ctx.fillStyle='#aaddff';ctx.fillRect(ox-2,oy-20,4,36);ctx.fillStyle='#cccccc';ctx.fillRect(ox-7,oy+12,14,4);ctx.fillStyle='#aa8833';ctx.fillRect(ox-2,oy+16,4,8);ctx.strokeStyle='#ddeeff';ctx.lineWidth=0.5;ctx.strokeRect(ox-2,oy-20,4,36);}
-  else if(type.id==='axe'){ctx.fillStyle='#885522';ctx.fillRect(ox-2,oy-18,4,34);ctx.fillStyle='#cc8833';ctx.beginPath();ctx.moveTo(ox-2,oy-18);ctx.lineTo(ox-14,oy-6);ctx.lineTo(ox-14,oy+6);ctx.lineTo(ox-2,oy-2);ctx.closePath();ctx.fill();ctx.strokeStyle='#ffaa44';ctx.lineWidth=0.5;ctx.stroke();}
-  else if(type.id==='staff'){ctx.fillStyle='#6633aa';ctx.fillRect(ox-2,oy-22,4,40);const g=ctx.createRadialGradient(ox,oy-22,1,ox,oy-22,8);g.addColorStop(0,'#ffffff');g.addColorStop(0.5,'#cc88ff');g.addColorStop(1,'rgba(80,0,180,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(ox,oy-22,9,0,Math.PI*2);ctx.fill();}
-  else if(type.id==='hammer'){ctx.fillStyle='#663322';ctx.fillRect(ox-2,oy-18,4,36);ctx.fillStyle='#888888';ctx.fillRect(ox-10,oy-18,20,14);ctx.strokeStyle='#aaaaaa';ctx.lineWidth=0.5;ctx.strokeRect(ox-10,oy-18,20,14);}
-  else if(type.id==='oneshot'){
-    ctx.fillStyle='#888899';ctx.fillRect(ox-2,oy-28,4,52);
-    ctx.strokeStyle='#ffffff';ctx.lineWidth=3;ctx.shadowColor='#ffffff';ctx.shadowBlur=12;
-    ctx.beginPath();ctx.moveTo(ox-2,oy-28);ctx.bezierCurveTo(ox+30,oy-28,ox+30,oy+4,ox-2,oy+4);ctx.stroke();
-    ctx.strokeStyle='rgba(200,220,255,0.5)';ctx.lineWidth=6;ctx.stroke();
-    ctx.shadowBlur=0;
-    const g=ctx.createRadialGradient(ox,oy-28,1,ox,oy-28,10);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.5,'rgba(180,200,255,0.7)');g.addColorStop(1,'rgba(100,120,255,0)');
-    ctx.fillStyle=g;ctx.beginPath();ctx.arc(ox,oy-28,10,0,Math.PI*2);ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawWeaponPickups(t){
-  for(const w of weaponPickups){
-    const sx=w.x-camX,sy=w.y-camY;
-    if(sx<-40||sx>W+40||sy<-40||sy>H+40)continue;
-    w.bob+=w.rare?0.03:0.05;const bob=Math.sin(w.bob)*(w.rare?8:4);
-    if(w.rare){
-      const pulse=0.5+0.5*Math.sin(t*0.08);
-      const auraR=40+pulse*20;
-      const ag=ctx.createRadialGradient(sx,sy,4,sx,sy,auraR);
-      ag.addColorStop(0,'rgba(255,255,255,0.4)');ag.addColorStop(0.5,'rgba(180,200,255,0.15)');ag.addColorStop(1,'rgba(100,120,255,0)');
-      ctx.fillStyle=ag;ctx.beginPath();ctx.arc(sx,sy,auraR,0,Math.PI*2);ctx.fill();
-      ctx.shadowColor='#ffffff';ctx.shadowBlur=30*pulse;
-      for(let i=0;i<6;i++){
-        const a=t*0.04+i*(Math.PI/3);const sr=28+pulse*6;
-        ctx.fillStyle=`rgba(200,220,255,${0.6*pulse})`;ctx.beginPath();ctx.arc(sx+Math.cos(a)*sr,sy+Math.sin(a)*sr,2,0,Math.PI*2);ctx.fill();
-      }
-    } else {
-      ctx.shadowColor=w.type.color;ctx.shadowBlur=14;
+  // ── Map ────────────────────────────────────────────────────────────
+  function buildMap() {
+    map = [];
+    for (let r = 0; r < MAP_H; r++) {
+      map[r] = [];
+      for (let c = 0; c < MAP_W; c++) map[r][c] = 0;
     }
-    ctx.fillStyle='rgba(0,0,0,0.5)';ctx.beginPath();ctx.ellipse(sx,sy+10,w.rare?18:12,5,0,0,Math.PI*2);ctx.fill();
-    ctx.save();ctx.translate(sx,sy+bob);ctx.rotate(Math.PI/5);drawWeaponShape(w.type,0,0,w.rare?1.3:1.0);ctx.restore();
-    ctx.shadowBlur=0;
-    const labelW=w.rare?100:56;
-    ctx.fillStyle=w.rare?'rgba(0,0,30,0.85)':'rgba(0,0,0,0.6)';ctx.fillRect(sx-labelW/2,sy-44+bob,labelW,w.rare?26:14);
-    if(w.rare){ctx.strokeStyle='#aaaaff';ctx.lineWidth=1;ctx.strokeRect(sx-labelW/2,sy-44+bob,labelW,26);}
-    ctx.fillStyle=w.type.color;ctx.font=w.rare?'bold 12px Georgia':'11px Georgia';ctx.textAlign='center';
-    ctx.fillText(w.type.name,sx,sy-(w.rare?30:23)+bob);
-    if(w.rare){ctx.fillStyle='#ff8888';ctx.font='10px Georgia';ctx.fillText('ONE-SHOT · SELTEN',sx,sy-18+bob);}
-    ctx.textAlign='left';
-  }
-}
-
-// ── Player ─────────────────────────────────────────────────────────────
-function drawPlayer(sx,sy){
-  const t=player.step,bob=Math.sin(t*0.25)*2,legSwing=Math.sin(t*0.25)*5;
-  const px=sx,py=sy+bob;
-  ctx.fillStyle='rgba(0,0,0,0.4)';ctx.beginPath();ctx.ellipse(px,py+28,10,4,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#2244aa';
-  ctx.save();ctx.translate(px-4,py+14);ctx.rotate(legSwing*Math.PI/180);ctx.fillRect(-3,0,6,14);ctx.restore();
-  ctx.save();ctx.translate(px+4,py+14);ctx.rotate(-legSwing*Math.PI/180);ctx.fillRect(-3,0,6,14);ctx.restore();
-  ctx.fillStyle='#334466';ctx.fillRect(px-7,py+2,14,14);
-  const armSwing=Math.sin(t*0.25)*8;
-  if(player.weapon&&attackAnim>0){
-    const swingAngle=((attackAnim/15)*Math.PI*1.2)*player.facing;
-    ctx.save();ctx.translate(px+player.facing*6,py+5);ctx.rotate(swingAngle);ctx.shadowColor=player.weapon.color;ctx.shadowBlur=12;drawWeaponShape(player.weapon,player.facing*10,-8,0.7);ctx.shadowBlur=0;ctx.restore();
-  } else {
-    ctx.fillStyle='#334466';
-    ctx.save();ctx.translate(px-7,py+4);ctx.rotate(-armSwing*Math.PI/180);ctx.fillRect(-5,0,5,11);ctx.restore();
-    ctx.save();ctx.translate(px+7,py+4);ctx.rotate(armSwing*Math.PI/180);ctx.fillRect(0,0,5,11);ctx.restore();
-    if(player.weapon){ctx.save();ctx.translate(px+player.facing*12,py+6);ctx.rotate(Math.PI/6*player.facing);drawWeaponShape(player.weapon,0,0,0.55);ctx.restore();}
-  }
-  ctx.fillStyle='#e8c9a0';ctx.fillRect(px-6,py-12,12,14);
-  ctx.fillStyle='#1a0a00';ctx.fillRect(px-4,py-9,3,3);ctx.fillRect(px+1,py-9,3,3);
-  ctx.fillStyle='#2a1800';ctx.fillRect(px-6,py-12,12,4);
-}
-
-// ── Pumpkin ────────────────────────────────────────────────────────────
-function drawPumpkin(p,t){
-  const px=p.x-camX,py=p.y-camY;
-  if(px<-80||px>W+80||py<-80||py>H+80)return;
-  const bob=Math.sin(p.wobble*0.04)*6,tilt=Math.sin(p.wobble*0.025)*8;
-  const hpRatio=p.hp/p.maxHp;
-  ctx.save();ctx.globalAlpha=p.alpha;ctx.translate(px,py+bob);ctx.rotate(tilt*Math.PI/180);
-  if(p.hitFlash>0){ctx.shadowColor='#ff2222';ctx.shadowBlur=30*(p.hitFlash/10);}
-  const glowR=60+Math.sin(t*0.08)*10;
-  const grd=ctx.createRadialGradient(0,0,5,0,0,glowR);
-  const gc=biome.pumpkinHue||'#6464ff';
-  grd.addColorStop(0,gc+'44');grd.addColorStop(1,'rgba(0,0,80,0)');
-  ctx.fillStyle=grd;ctx.beginPath();ctx.arc(0,0,glowR,0,Math.PI*2);ctx.fill();
-  ctx.globalAlpha=p.alpha*0.3;ctx.fillStyle='#000066';ctx.beginPath();ctx.ellipse(0,36,22,8,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=p.alpha;
-  // horns
-  ctx.fillStyle='#111';ctx.strokeStyle='#333';ctx.lineWidth=1;
-  const hw=Math.sin(p.hornWobble*0.03)*2;
-  ctx.save();ctx.translate(-18,-24);ctx.rotate((-15+hw)*Math.PI/180);ctx.beginPath();ctx.moveTo(-5,18);ctx.lineTo(0,-18);ctx.lineTo(5,18);ctx.closePath();ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(-2,-16);ctx.lineTo(0,-26);ctx.lineTo(2,-16);ctx.closePath();ctx.fillStyle='#222';ctx.fill();ctx.restore();
-  ctx.save();ctx.translate(18,-24);ctx.rotate((15-hw)*Math.PI/180);ctx.fillStyle='#111';ctx.beginPath();ctx.moveTo(-5,18);ctx.lineTo(0,-18);ctx.lineTo(5,18);ctx.closePath();ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(-2,-16);ctx.lineTo(0,-26);ctx.lineTo(2,-16);ctx.closePath();ctx.fillStyle='#222';ctx.fill();ctx.restore();
-  // body — tinted by biome pumpkinHue (parse HSL to approximate RGB)
-  const ph = biome.hue ? (biome.hue + 60) % 360 : 30;
-  const [tintR,tintG,tintB] = hslToRgb(ph,80,55);
-  const dmgR=Math.floor((1-hpRatio)*80);
-  for(let i=0;i<5;i++){
-    const segX=(i-2)*10,sw=14-Math.abs(i-2)*1.5,sh=26-Math.abs(i-2)*2;
-    const sg=ctx.createRadialGradient(segX-3,-6,2,segX,0,sw+4);
-    sg.addColorStop(0,`rgb(${Math.min(255,tintR+dmgR)},${Math.max(0,tintG-dmgR)},${Math.max(0,tintB-dmgR)})`);
-    sg.addColorStop(0.6,`rgb(${Math.max(0,tintR-30)},${Math.max(0,tintG-30)},${Math.max(0,tintB-20)})`);
-    sg.addColorStop(1,'#7788aa');
-    ctx.fillStyle=sg;ctx.strokeStyle='rgba(180,200,255,0.3)';ctx.lineWidth=0.8;
-    ctx.beginPath();ctx.ellipse(segX,0,sw,sh,0,0,Math.PI*2);ctx.fill();ctx.stroke();
-  }
-  ctx.fillStyle='#2a1a0a';ctx.fillRect(-3,-26,6,8);ctx.fillStyle='#3a2a1a';ctx.fillRect(-2,-28,4,5);
-  // face
-  const faceColor=biome.pumpkinHue||'#0022aa';
-  ctx.fillStyle=faceColor;ctx.shadowColor=biome.pumpkinHue||'#4488ff';ctx.shadowBlur=8;
-  ctx.beginPath();ctx.moveTo(-14,-8);ctx.lineTo(-8,-16);ctx.lineTo(-2,-8);ctx.closePath();ctx.fill();
-  ctx.beginPath();ctx.moveTo(2,-8);ctx.lineTo(8,-16);ctx.lineTo(14,-8);ctx.closePath();ctx.fill();
-  ctx.beginPath();ctx.moveTo(-14,6);ctx.lineTo(-10,14);ctx.lineTo(-6,6);ctx.lineTo(-2,12);ctx.lineTo(2,6);ctx.lineTo(6,14);ctx.lineTo(10,6);ctx.lineTo(14,6);ctx.lineTo(12,18);ctx.lineTo(-12,18);ctx.closePath();ctx.fill();
-  ctx.shadowBlur=0;
-  drawFlame(0,-28,t,biome.pumpkinHue);
-  ctx.restore();
-  // hp bar
-  if(!p.dead){
-    const bw=60,bh=7,bx=px-bw/2,by=py+bob-58;
-    ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(bx-1,by-1,bw+2,bh+2);
-    ctx.fillStyle='#330000';ctx.fillRect(bx,by,bw,bh);
-    const hc=hpRatio>0.5?`rgb(${Math.floor(255*(1-hpRatio)*2)},200,80)`:`rgb(220,${Math.floor(hpRatio*400)},20)`;
-    ctx.fillStyle=hc;ctx.fillRect(bx,by,bw*hpRatio,bh);
-    ctx.strokeStyle='#555';ctx.lineWidth=0.5;ctx.strokeRect(bx,by,bw,bh);
-  }
-}
-
-function drawFlame(fx,fy,t,colorHue){
-  const flicker=Math.sin(t*0.15)*3+Math.sin(t*0.23)*2;
-  const h=28+flicker,w=12+Math.sin(t*0.1)*2;
-  const c1=colorHue?colorHue+'cc':'rgba(80,120,255,0.8)';
-  const g1=ctx.createRadialGradient(fx,fy-h*0.4,1,fx,fy-h*0.3,w);
-  g1.addColorStop(0,'rgba(220,235,255,0.95)');g1.addColorStop(0.4,c1);g1.addColorStop(0.8,'rgba(20,40,200,0.4)');g1.addColorStop(1,'rgba(0,0,100,0)');
-  ctx.fillStyle=g1;ctx.shadowColor=colorHue||'#4488ff';ctx.shadowBlur=18;
-  ctx.beginPath();ctx.moveTo(fx-w*0.6,fy);ctx.bezierCurveTo(fx-w,fy-h*0.3,fx-w*0.5,fy-h*0.7,fx+Math.sin(t*0.07)*3,fy-h);ctx.bezierCurveTo(fx+w*0.5,fy-h*0.7,fx+w,fy-h*0.3,fx+w*0.6,fy);ctx.closePath();ctx.fill();
-  const g2=ctx.createRadialGradient(fx,fy-h*0.35,1,fx,fy-h*0.3,w*0.5);
-  g2.addColorStop(0,'rgba(255,255,255,0.95)');g2.addColorStop(0.5,'rgba(190,210,255,0.7)');g2.addColorStop(1,'rgba(80,120,255,0)');
-  ctx.fillStyle=g2;ctx.beginPath();ctx.moveTo(fx-w*0.3,fy);ctx.bezierCurveTo(fx-w*0.5,fy-h*0.4,fx-w*0.2,fy-h*0.75,fx,fy-h*0.85);ctx.bezierCurveTo(fx+w*0.2,fy-h*0.75,fx+w*0.5,fy-h*0.4,fx+w*0.3,fy);ctx.closePath();ctx.fill();
-  ctx.shadowBlur=0;
-}
-
-// ── Particles ──────────────────────────────────────────────────────────
-function spawnFlameParticles(x,y){for(let i=0;i<3;i++)particles.push({x,y,vx:(Math.random()-0.5)*1.5,vy:-Math.random()*2-0.5,life:1,size:Math.random()*4+2,type:'flame'});}
-function spawnHitParticles(x,y,color){for(let i=0;i<10;i++){const a=Math.random()*Math.PI*2,s=Math.random()*4+1;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,size:Math.random()*5+2,type:'hit',color});}}
-function drawParticles(){
-  for(const p of particles){
-    ctx.globalAlpha=p.life*0.85;
-    if(p.type==='flame'){ctx.fillStyle=`hsl(${210+Math.random()*40},100%,${70+p.life*30}%)`;ctx.shadowColor='#4488ff';ctx.shadowBlur=8;}
-    else{ctx.fillStyle=p.color||'#fff';ctx.shadowColor=p.color||'#fff';ctx.shadowBlur=6;}
-    ctx.beginPath();ctx.arc(p.x-camX,p.y-camY,p.size*p.life,0,Math.PI*2);ctx.fill();
-  }
-  ctx.globalAlpha=1;ctx.shadowBlur=0;
-}
-
-function drawAttackArc(){
-  if(!player.weapon||attackAnim<=0)return;
-  const sx=player.x-camX,sy=player.y-camY,prog=attackAnim/15,range=player.weapon.range,arc=Math.PI*0.8;
-  ctx.save();ctx.globalAlpha=prog*0.35;ctx.fillStyle=player.weapon.color;ctx.shadowColor=player.weapon.color;ctx.shadowBlur=20;
-  ctx.beginPath();ctx.moveTo(sx,sy);ctx.arc(sx,sy,range*prog,attackAngle-arc*0.5,attackAngle+arc*(0.3+0.7*prog));ctx.closePath();ctx.fill();ctx.restore();
-}
-
-// ── Overlay ────────────────────────────────────────────────────────────
-function drawNightOverlay(){
-  const b=biome;
-  const grd=ctx.createRadialGradient(W/2,H/2,H*0.3,W/2,H/2,H*0.85);
-  grd.addColorStop(0,`rgba(${b.overlayR},${b.overlayG},${b.overlayB},0)`);
-  grd.addColorStop(1,`rgba(${b.overlayR},${b.overlayG},${b.overlayB},${b.overlayA})`);
-  ctx.fillStyle=grd;ctx.fillRect(0,0,W,H);
-}
-
-// ── Biome bar (wave progress 1–1000) ─────────────────────────────────
-function drawBiomeBar(){
-  const barW=200,barH=22,barX=(W-barW)/2,barY=H-36;
-  ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(barX-4,barY-4,barW+8,barH+8);
-  ctx.fillStyle='#111';ctx.fillRect(barX,barY,barW,barH);
-  // progress fill using biome hue
-  const prog=Math.max(0,Math.min(1,(wave-1)/999));
-  const fillColor=biome.pumpkinHue||'#4466ff';
-  ctx.fillStyle=fillColor;ctx.fillRect(barX,barY,barW*prog,barH);
-  ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.strokeRect(barX,barY,barW,barH);
-  ctx.fillStyle='#ccddee';ctx.font='11px Georgia';ctx.textAlign='center';
-  ctx.fillText(`${biome.emoji} Welle ${wave} / 100`,barX+barW/2,barY+15);
-  ctx.textAlign='left';
-
-  // wave progress bar (left side) — kill counter
-  const wpx=8,wpy=H-36,wpw=110,wph=22;
-  ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(wpx-2,wpy-2,wpw+4,wph+4);
-  ctx.fillStyle='#222';ctx.fillRect(wpx,wpy,wpw,wph);
-  ctx.fillStyle='#aabbcc';ctx.font='11px Georgia';ctx.fillText(`💀 ${totalKilled+killed} gesamt`,wpx+4,wpy+15);
-}
-
-// ── HUD ────────────────────────────────────────────────────────────────
-function drawHUD(elapsed){
-  const secs=Math.floor(elapsed/1000),mins=Math.floor(secs/60),s=(secs%60).toString().padStart(2,'0');
-  ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(8,8,140,30);
-  ctx.fillStyle='#8899cc';ctx.font='14px Georgia';ctx.fillText(`⏱ ${mins}:${s} überlebt`,16,28);
-
-  const alive=pumpkins.filter(p=>!p.dead);
-  const minDist=alive.length?Math.min(...alive.map(p=>Math.hypot(p.x-player.x,p.y-player.y))):999;
-  const danger=Math.max(0,1-minDist/300);
-  ctx.fillStyle=`rgba(${Math.floor(danger*255)},0,${Math.floor((1-danger)*100)},0.7)`;
-  ctx.fillRect(W-148,8,140,30);ctx.fillStyle='#ccaaff';ctx.font='13px Georgia';
-  ctx.fillText(minDist<80?'⚠ SIE SIND NAH!':minDist<160?'👁 Vorsicht!':'🌑 Sicher... vorerst',W-140,28);
-
-  // biome name
-  ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(W/2-90,8,180,30);
-  ctx.fillStyle='#ffcc44';ctx.font='14px Georgia';ctx.textAlign='center';
-  ctx.fillText(`${biome.emoji} ${biome.name}  💀${killed}`,W/2,28);ctx.textAlign='left';
-
-  if(alive.length>0){
-    ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(W/2-55,42,110,20);
-    ctx.fillStyle='#ff8888';ctx.font='12px Georgia';ctx.textAlign='center';
-    ctx.fillText(`${alive.length} Kürbis${alive.length>1?'se':''} übrig`,W/2,57);ctx.textAlign='left';
-  }
-
-  // weapon slot
-  ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(8,H-90,180,42);
-  ctx.strokeStyle=player.weapon?player.weapon.color:'#333';ctx.lineWidth=1.5;ctx.strokeRect(8,H-90,180,42);
-  if(player.weapon){
-    ctx.fillStyle=player.weapon.color;ctx.font='13px Georgia';ctx.fillText(`${player.weapon.icon} ${player.weapon.name}`,16,H-71);
-    const cdPct=player.attackCooldown>0?player.attackCooldown/player.weapon.cooldown:0;
-    if(cdPct>0){ctx.fillStyle='#334';ctx.fillRect(16,H-60,160,8);ctx.fillStyle='#4488ff';ctx.fillRect(16,H-60,160*(1-cdPct),8);ctx.fillStyle='#88aaff';ctx.font='10px Georgia';ctx.fillText('Aufladen...',70,H-53);}
-    else{ctx.fillStyle='#88ff88';ctx.font='11px Georgia';ctx.fillText('LEERTASTE = Angriff',16,H-53);}
-  } else {
-    ctx.fillStyle='#556';ctx.font='12px Georgia';ctx.fillText('Keine Waffe — finde eine!',16,H-74);
-    ctx.fillStyle='#445';ctx.font='11px Georgia';ctx.fillText('Laufe über leuchtende Waffen',16,H-60);
-  }
-
-  // damage floaters
-  for(const e of hitEffects){
-    ctx.globalAlpha=Math.min(1,e.life);
-    if(e.big){
-      ctx.fillStyle='#ffffff';ctx.shadowColor='#aaaaff';ctx.shadowBlur=20;
-      ctx.font=`bold 28px Georgia`;ctx.textAlign='center';
-      ctx.fillText(String(e.dmg),e.x-camX,e.y-camY);
-      ctx.fillStyle='#ffddff';ctx.font='bold 14px Georgia';
-      ctx.fillText('INSTANT KILL',e.x-camX,e.y-camY+18);
-      ctx.textAlign='left';
-    } else {
-      ctx.fillStyle='#ff4444';ctx.shadowColor='#ff0000';ctx.shadowBlur=8;
-      ctx.font=`bold ${14+Math.floor((1-e.life)*4)}px Georgia`;ctx.fillText(`-${e.dmg}`,e.x-camX,e.y-camY);
-    }
-    ctx.shadowBlur=0;ctx.globalAlpha=1;
-  }
-
-  // screen flash for one-shot
-  if(screenFlash>0){
-    ctx.globalAlpha=screenFlash/20*0.6;
-    ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
-    ctx.globalAlpha=1;screenFlash--;
-  }
-
-  // wave label
-  if(waveLabel.timer>0){
-    const a=Math.min(1,waveLabel.timer/30);ctx.globalAlpha=a;
-    ctx.fillStyle='rgba(0,0,0,0.75)';ctx.fillRect(W/2-180,H/2-28,360,48);
-    ctx.strokeStyle=biome.pumpkinHue||'#ffcc44';ctx.lineWidth=1.5;ctx.strokeRect(W/2-180,H/2-28,360,48);
-    ctx.fillStyle=biome.pumpkinHue||'#ffcc44';ctx.font='bold 16px Georgia';ctx.textAlign='center';
-    ctx.fillText(waveLabel.text,W/2,H/2+4);ctx.textAlign='left';ctx.globalAlpha=1;waveLabel.timer--;
-  }
-
-  drawBiomeBar();
-}
-
-// ── Game init ──────────────────────────────────────────────────────────
-function startGame(){
-  document.getElementById('startScreen').style.display='none';
-  document.getElementById('gameOver').style.display='none';
-  document.getElementById('winScreen').style.display='none';
-  killed=0; totalKilled=0;
-  initGame();
-}
-
-function initGame(){
-  cancelAnimationFrame(loopId);
-  buildMap();spawnWeapons();
-  player={x:25*TILE,y:19*TILE,facing:1,step:0,weapon:null,attackCooldown:0};
-  pumpkins=[];particles=[];hitEffects=[];ambientParticles=[];
-  attackAnim=0;wave=0;killed=0;screenFlash=0;
-  keys={};gameActive=true;startTime=Date.now();lastT=0;
-  camX=player.x-W/2;camY=player.y-H/2;
-  canvas.focus();
-  spawnWave(1);
-  loopId=requestAnimationFrame(loop);
-}
-
-window.addEventListener('keydown',e=>{
-  if(gameActive&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();
-  keys[e.key]=true;
-});
-window.addEventListener('keyup',e=>{keys[e.key]=false;});
-canvas.addEventListener('click',()=>canvas.focus());
-
-// ── Main Loop ──────────────────────────────────────────────────────────
-let lastT=0;
-function loop(ts){
-  if(!gameActive)return;
-  const elapsed=Date.now()-startTime;
-  lastT=ts;flickerT++;
-
-  // movement
-  const spd=2.8;let dx=0,dy=0;
-  if(keys['ArrowLeft']||keys['a']||keys['A'])dx-=spd;
-  if(keys['ArrowRight']||keys['d']||keys['D'])dx+=spd;
-  if(keys['ArrowUp']||keys['w']||keys['W'])dy-=spd;
-  if(keys['ArrowDown']||keys['s']||keys['S'])dy+=spd;
-  if(dx!==0||dy!==0){const len=Math.hypot(dx,dy);dx=dx/len*spd;dy=dy/len*spd;player.step+=1.5;if(dx!==0)player.facing=Math.sign(dx);}
-  const nx=player.x+dx,ny=player.y+dy,half=8,foot=26;
-  if(!isSolid(nx-half,player.y+foot)&&!isSolid(nx+half,player.y+foot)&&!isSolid(nx-half,player.y+10)&&!isSolid(nx+half,player.y+10))player.x=nx;
-  if(!isSolid(player.x-half,ny+foot)&&!isSolid(player.x+half,ny+foot)&&!isSolid(player.x-half,ny+10)&&!isSolid(player.x+half,ny+10))player.y=ny;
-  player.x=Math.max(half,Math.min(MAP_W*TILE-half,player.x));
-  player.y=Math.max(10,Math.min(MAP_H*TILE-6,player.y));
-
-  // weapon pickup
-  for(let i=weaponPickups.length-1;i>=0;i--){const w=weaponPickups[i];if(Math.hypot(w.x-player.x,w.y-player.y)<28){player.weapon=w.type;player.attackCooldown=0;weaponPickups.splice(i,1);}}
-
-  // attack
-  if(player.attackCooldown>0)player.attackCooldown--;
-  const alive=pumpkins.filter(p=>!p.dead);
-  if((keys[' ']||keys['Space'])&&player.weapon&&player.attackCooldown===0&&alive.length>0){
-    const nearest=alive.reduce((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)<Math.hypot(b.x-player.x,b.y-player.y)?a:b);
-    attackAnim=15;attackAngle=Math.atan2(nearest.y-player.y,nearest.x-player.x);player.attackCooldown=player.weapon.cooldown;
-    const isOneShot=player.weapon.id==='oneshot';
-    const hitRange=isOneShot?W*2:player.weapon.range+10;
-    for(const p of alive){
-      if(Math.hypot(p.x-player.x,p.y-player.y)<=hitRange){
-        p.hp=0;p.hitFlash=10;
-        spawnHitParticles(p.x,p.y,player.weapon.color);
-        if(isOneShot){
-          for(let i=0;i<3;i++)spawnHitParticles(p.x,p.y,'#ffffff');
-          hitEffects.push({x:p.x,y:p.y-30,dmg:'☠',life:1.5,big:true});
-        } else {
-          hitEffects.push({x:p.x+(Math.random()-0.5)*20,y:p.y-30,dmg:player.weapon.damage,life:1});
+    const houses = [
+      [1,1],[1,8],[1,16],[1,24],[1,32],[1,40],[1,46],
+      [7,4],[7,12],[7,20],[7,28],[7,36],[7,44],
+      [13,1],[13,9],[13,17],[13,25],[13,33],[13,41],
+      [19,5],[19,13],[19,29],[19,37],[19,44],
+      [25,1],[25,9],[25,17],[25,25],[25,33],[25,41],
+      [31,4],[31,12],[31,20],[31,28],[31,36],[31,44],
+      [35,1],[35,9],[35,40],[35,46],
+    ];
+    for (const h of houses) {
+      for (let dr = 0; dr < 3; dr++)
+        for (let dc = 0; dc < 4; dc++) {
+          const r = h[0] + dr, c = h[1] + dc;
+          if (r < MAP_H && c < MAP_W) map[r][c] = 1;
         }
-        const ddx=p.x-player.x,ddy=p.y-player.y,dd=Math.hypot(ddx,ddy)||1;
-        p.vx+=(ddx/dd)*(isOneShot?12:5);p.vy+=(ddy/dd)*(isOneShot?12:5);
+    }
+    const trees = [
+      [0,0],[0,6],[0,13],[0,21],[0,29],[0,37],[0,44],[0,49],
+      [5,3],[5,18],[5,26],[5,42],
+      [11,7],[11,15],[11,31],[11,47],
+      [17,0],[17,11],[17,23],[17,35],[17,48],
+      [23,6],[23,15],[23,31],[23,39],
+      [29,2],[29,18],[29,26],[29,42],[29,49],
+      [37,5],[37,14],[37,22],[37,30],[37,38],
+    ];
+    for (const t of trees) {
+      if (t[0] < MAP_H && t[1] < MAP_W) map[t[0]][t[1]] = 2;
+    }
+    // fence rows (leave gaps so the player can always pass)
+    for (const fr of [10, 22, 34]) {
+      for (let c = 0; c < MAP_W; c++) {
+        if (c % 7 === 3) continue; // gap
+        if (map[fr][c] === 0) map[fr][c] = 3;
       }
     }
-    if(isOneShot)screenFlash=20;
   }
-  if(attackAnim>0)attackAnim--;
 
-  // camera
-  camX+=(player.x-W/2-camX)*0.1;camY+=(player.y-H/2-camY)*0.1;
+  function solidAt(px, py) {
+    const c = Math.floor(px / TILE), r = Math.floor(py / TILE);
+    if (r < 0 || r >= MAP_H || c < 0 || c >= MAP_W) return true;
+    const t = map[r][c];
+    return t === 1 || t === 2; // houses & trees block; fences are decorative/passable
+  }
 
-  // pumpkin AI
-  const chaseSpeed=0.9+Math.min(3,wave/50)*1.2;
-  for(const p of pumpkins){
-    p.wobble++;p.hornWobble++;p.flameT++;if(p.hitFlash>0)p.hitFlash--;
-    if(p.appearing){p.alpha=Math.min(1,p.alpha+0.012);if(p.alpha>=1)p.appearing=false;}
-    if(!p.dead){
-      const pdx=player.x-p.x,pdy=player.y-p.y,pdist=Math.hypot(pdx,pdy);
-      if(pdist>5){p.vx+=(pdx/pdist)*chaseSpeed*0.06;p.vy+=(pdy/pdist)*chaseSpeed*0.06;}
-      p.vx*=0.93;p.vy*=0.93;p.vx+=(Math.random()-0.5)*0.18;p.vy+=(Math.random()-0.5)*0.18;
-      p.x+=p.vx;p.y+=p.vy;
-      if(flickerT%3===0)spawnFlameParticles(p.x,p.y-38);
-      if(pdist<32){
-        gameActive=false;
-        const sc=Math.floor(elapsed/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
-        document.getElementById('goStage').textContent=`Welle ${wave} · ${totalKilled+killed} Kürbisse getötet`;
-        document.getElementById('goTime').textContent=`Zeit: ${mn}:${ss}`;
-        document.getElementById('gameOver').style.display='flex';return;
+  // Find an open tile near the center for the player spawn
+  function findSpawn() {
+    const cr = Math.floor(MAP_H / 2), cc = Math.floor(MAP_W / 2);
+    for (let radius = 0; radius < 20; radius++) {
+      for (let dr = -radius; dr <= radius; dr++) {
+        for (let dc = -radius; dc <= radius; dc++) {
+          const r = cr + dr, c = cc + dc;
+          if (r > 0 && r < MAP_H - 1 && c > 0 && c < MAP_W - 1 && map[r][c] === 0) {
+            return { x: c * TILE + TILE / 2, y: r * TILE + TILE / 2 };
+          }
+        }
       }
-      if(p.hp<=0){p.dead=true;killed++;totalKilled++;spawnHitParticles(p.x,p.y,biome.pumpkinHue||'#4488ff');spawnHitParticles(p.x,p.y,'#ffffff');}
-    } else {p.alpha=Math.max(0,p.alpha-0.025);}
-  }
-  for(let i=pumpkins.length-1;i>=0;i--)if(pumpkins[i].dead&&pumpkins[i].alpha<=0)pumpkins.splice(i,1);
-
-  // wave progression — seamless, no stage screen
-  const remaining=pumpkins.filter(p=>!p.dead);
-  if(remaining.length===0&&pumpkins.every(p=>p.alpha<=0)){
-    const nextWave=wave+1;
-    if(nextWave>100){
-      // full win
-      gameActive=false;
-      const sc=Math.floor((Date.now()-startTime)/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
-      document.getElementById('winTime').textContent=`${mn}:${ss} · 💀 ${totalKilled+killed} Kürbisse getötet`;
-      document.getElementById('winScreen').style.display='flex';
-      return;
     }
-    spawnWave(nextWave);
+    return { x: MAP_W * TILE / 2, y: MAP_H * TILE / 2 };
   }
 
-  // particles
-  for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=0.025;}
-  for(let i=particles.length-1;i>=0;i--)if(particles[i].life<=0)particles.splice(i,1);
-  for(const e of hitEffects){e.y-=1;e.life-=0.04;}
-  for(let i=hitEffects.length-1;i>=0;i--)if(hitEffects[i].life<=0)hitEffects.splice(i,1);
-  updateAmbient();
+  // ── Spawning ───────────────────────────────────────────────────────
+  function spawnWeapons() {
+    weapons = [];
+    const spots = [
+      [5,5],[14,5],[24,5],[34,5],[44,5],
+      [8,15],[18,15],[28,15],[38,15],[46,15],
+      [4,27],[14,27],[24,27],[34,27],[44,27],
+      [10,33],[20,33],[30,33],[40,33],
+    ];
+    let wi = 0;
+    for (const s of spots) {
+      const c = s[0], r = s[1];
+      if (map[r] && map[r][c] === 0) {
+        weapons.push({ x: c * TILE + TILE/2, y: r * TILE + TILE/2, type: WEAPONS[wi % 4], bob: Math.random() * Math.PI * 2, rare: false });
+        wi++;
+      }
+    }
+    // one-shot scythe — rare, near center
+    const sp = findSpawn();
+    weapons.push({ x: sp.x + TILE * 3, y: sp.y, type: WEAPONS[4], bob: 0, rare: true });
+  }
 
-  // draw
-  ctx.fillStyle=biome.bg;ctx.fillRect(0,0,W,H);
-  drawWorld();
-  drawAmbient();
-  drawWeaponPickups(flickerT);
-  drawParticles();
-  drawAttackArc();
-  drawPlayer(player.x-camX,player.y-camY);
-  for(const p of pumpkins)if(!p.dead||p.alpha>0)drawPumpkin(p,flickerT);
-  drawNightOverlay();
-  drawHUD(elapsed);
+  function spawnWave(n) {
+    wave = n;
+    waveKills = 0;
+    biome = generateBiome(n);
+    const count = Math.min(8, 1 + Math.floor((n - 1) / 8)); // 1 pumpkin, +1 every 8 waves, cap 8
+    const hp = 80 + n * 6;
+    waveBanner = { text: biome.emoji + ' Welle ' + n + '/' + MAX_WAVE + ' · ' + biome.name, timer: 150 };
+    for (let i = 0; i < count; i++) {
+      const ang = (Math.PI * 2 / count) * i + 0.4;
+      const dist = 320 + (i % 3) * 60;
+      let px = player.x + Math.cos(ang) * dist;
+      let py = player.y + Math.sin(ang) * dist;
+      px = Math.max(TILE, Math.min(MAP_W * TILE - TILE, px));
+      py = Math.max(TILE, Math.min(MAP_H * TILE - TILE, py));
+      pumpkins.push({
+        x: px, y: py, vx: 0, vy: 0,
+        wob: Math.random() * 100, horn: Math.random() * 100,
+        alpha: 0, appearing: true,
+        hp: hp, maxHp: hp, dead: false, flash: 0,
+      });
+    }
+  }
 
-  loopId=requestAnimationFrame(loop);
-}
+  // ── Particles ──────────────────────────────────────────────────────
+  function flameParticles(x, y) {
+    for (let i = 0; i < 2; i++)
+      particles.push({ x, y, vx: (Math.random()-0.5)*1.4, vy: -Math.random()*2-0.5, life: 1, size: Math.random()*4+2, kind: 'flame' });
+  }
+  function hitParticles(x, y, color) {
+    for (let i = 0; i < 9; i++) {
+      const a = Math.random() * Math.PI * 2, s = Math.random() * 4 + 1;
+      particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, size: Math.random()*5+2, kind: 'hit', color });
+    }
+  }
+
+  // ── Drawing: tiles ─────────────────────────────────────────────────
+  function drawTile(t, sx, sy) {
+    const b = biome;
+    if (t === 0) {
+      ctx.fillStyle = b.ground; ctx.fillRect(sx, sy, TILE, TILE);
+      ctx.fillStyle = b.groundAlt;
+      ctx.fillRect(sx+2, sy+2, 17, 17); ctx.fillRect(sx+21, sy+21, 17, 17);
+      ctx.fillRect(sx+2, sy+22, 17, 15); ctx.fillRect(sx+21, sy+2, 17, 17);
+      ctx.strokeStyle = b.groundLine; ctx.lineWidth = 0.5;
+      ctx.strokeRect(sx+2, sy+2, 17, 17); ctx.strokeRect(sx+21, sy+21, 17, 17);
+    } else if (t === 1) {
+      ctx.fillStyle = b.house; ctx.fillRect(sx, sy, TILE, TILE);
+      ctx.fillStyle = b.houseWall; ctx.fillRect(sx+2, sy+2, TILE-4, TILE-4);
+      ctx.fillStyle = b.houseWin; ctx.shadowColor = b.houseWinGlow; ctx.shadowBlur = 6;
+      ctx.fillRect(sx+8, sy+10, 10, 8); ctx.shadowBlur = 0;
+    } else if (t === 2) {
+      ctx.fillStyle = b.house; ctx.fillRect(sx+17, sy+24, 6, 16);
+      ctx.fillStyle = b.tree; ctx.beginPath(); ctx.arc(sx+20, sy+16, 16, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = b.treeTop; ctx.beginPath(); ctx.arc(sx+20, sy+8, 12, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = b.treeHL; ctx.beginPath(); ctx.arc(sx+16, sy+14, 6, 0, Math.PI*2); ctx.fill();
+    } else if (t === 3) {
+      ctx.fillStyle = b.ground; ctx.fillRect(sx, sy, TILE, TILE);
+      ctx.fillStyle = b.fence;
+      ctx.fillRect(sx+2, sy+16, TILE-4, 4); ctx.fillRect(sx+2, sy+24, TILE-4, 4);
+      for (let i = 4; i < TILE-4; i += 8) ctx.fillRect(sx+i, sy+10, 4, 22);
+    }
+  }
+
+  function drawWorld() {
+    const startC = Math.floor(camX / TILE) - 1, startR = Math.floor(camY / TILE) - 1;
+    const endC = startC + Math.ceil(W / TILE) + 3, endR = startR + Math.ceil(H / TILE) + 3;
+    for (let r = startR; r < endR; r++) {
+      for (let c = startC; c < endC; c++) {
+        const sx = c * TILE - camX, sy = r * TILE - camY;
+        if (r < 0 || r >= MAP_H || c < 0 || c >= MAP_W) {
+          ctx.fillStyle = biome.bg; ctx.fillRect(sx, sy, TILE, TILE);
+        } else {
+          drawTile(map[r][c], sx, sy);
+        }
+      }
+    }
+  }
+
+  // ── Drawing: weapons ───────────────────────────────────────────────
+  function drawWeaponShape(type, scale) {
+    ctx.save(); ctx.scale(scale, scale);
+    if (type.id === 'sword') {
+      ctx.fillStyle = '#aaddff'; ctx.fillRect(-2, -20, 4, 36);
+      ctx.fillStyle = '#cccccc'; ctx.fillRect(-7, 12, 14, 4);
+      ctx.fillStyle = '#aa8833'; ctx.fillRect(-2, 16, 4, 8);
+    } else if (type.id === 'axe') {
+      ctx.fillStyle = '#885522'; ctx.fillRect(-2, -18, 4, 34);
+      ctx.fillStyle = '#cc8833';
+      ctx.beginPath(); ctx.moveTo(-2,-18); ctx.lineTo(-14,-6); ctx.lineTo(-14,6); ctx.lineTo(-2,-2); ctx.closePath(); ctx.fill();
+    } else if (type.id === 'staff') {
+      ctx.fillStyle = '#6633aa'; ctx.fillRect(-2, -22, 4, 40);
+      const g = ctx.createRadialGradient(0,-22,1,0,-22,9);
+      g.addColorStop(0,'#ffffff'); g.addColorStop(0.5,'#cc88ff'); g.addColorStop(1,'rgba(80,0,180,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,-22,9,0,Math.PI*2); ctx.fill();
+    } else if (type.id === 'hammer') {
+      ctx.fillStyle = '#663322'; ctx.fillRect(-2,-18,4,36);
+      ctx.fillStyle = '#888888'; ctx.fillRect(-10,-18,20,14);
+    } else if (type.id === 'scythe') {
+      ctx.fillStyle = '#999'; ctx.fillRect(-2,-28,4,52);
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.shadowColor = '#fff'; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.moveTo(-2,-28); ctx.bezierCurveTo(28,-28,28,4,-2,4); ctx.stroke();
+      ctx.shadowBlur = 0;
+      const g = ctx.createRadialGradient(0,-28,1,0,-28,10);
+      g.addColorStop(0,'#fff'); g.addColorStop(0.5,'rgba(180,200,255,0.7)'); g.addColorStop(1,'rgba(100,120,255,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,-28,10,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawWeapons() {
+    for (const w of weapons) {
+      const sx = w.x - camX, sy = w.y - camY;
+      if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) continue;
+      w.bob += w.rare ? 0.03 : 0.05;
+      const bob = Math.sin(w.bob) * (w.rare ? 7 : 4);
+      if (w.rare) {
+        const pulse = 0.5 + 0.5 * Math.sin(frame * 0.08);
+        const ag = ctx.createRadialGradient(sx, sy, 4, sx, sy, 40 + pulse * 18);
+        ag.addColorStop(0, 'rgba(255,255,255,0.35)'); ag.addColorStop(1, 'rgba(100,120,255,0)');
+        ctx.fillStyle = ag; ctx.beginPath(); ctx.arc(sx, sy, 40 + pulse * 18, 0, Math.PI*2); ctx.fill();
+        ctx.shadowColor = '#fff'; ctx.shadowBlur = 28 * pulse;
+      } else {
+        ctx.shadowColor = w.type.color; ctx.shadowBlur = 12;
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.beginPath(); ctx.ellipse(sx, sy + 10, w.rare ? 16 : 11, 5, 0, 0, Math.PI*2); ctx.fill();
+      ctx.save(); ctx.translate(sx, sy + bob); ctx.rotate(Math.PI/5); drawWeaponShape(w.type, w.rare ? 1.2 : 1); ctx.restore();
+      ctx.shadowBlur = 0;
+      // label
+      const lw = w.rare ? 110 : 58;
+      ctx.fillStyle = w.rare ? 'rgba(0,0,30,0.85)' : 'rgba(0,0,0,0.6)';
+      ctx.fillRect(sx - lw/2, sy - 42 + bob, lw, w.rare ? 24 : 14);
+      ctx.fillStyle = w.type.color; ctx.font = (w.rare ? 'bold 12px' : '11px') + ' Georgia';
+      ctx.textAlign = 'center';
+      ctx.fillText(w.type.name, sx, sy - (w.rare ? 30 : 31) + bob);
+      if (w.rare) { ctx.fillStyle = '#ff8888'; ctx.font = '9px Georgia'; ctx.fillText('ONE-SHOT', sx, sy - 20 + bob); }
+      ctx.textAlign = 'left';
+    }
+  }
+
+  // ── Drawing: player ────────────────────────────────────────────────
+  function drawPlayer() {
+    const sx = player.x - camX, sy = player.y - camY;
+    const t = player.step;
+    const bob = Math.sin(t * 0.25) * 2;
+    const legSwing = Math.sin(t * 0.25) * 5;
+    const px = sx, py = sy + bob;
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.ellipse(px, py + 26, 10, 4, 0, 0, Math.PI*2); ctx.fill();
+
+    // legs (animated)
+    ctx.fillStyle = '#2244aa';
+    ctx.save(); ctx.translate(px - 4, py + 12); ctx.rotate(legSwing * Math.PI/180); ctx.fillRect(-3,0,6,14); ctx.restore();
+    ctx.save(); ctx.translate(px + 4, py + 12); ctx.rotate(-legSwing * Math.PI/180); ctx.fillRect(-3,0,6,14); ctx.restore();
+
+    // body
+    ctx.fillStyle = '#334466'; ctx.fillRect(px - 7, py, 14, 14);
+
+    // arms / weapon (animated swing on attack)
+    const armSwing = Math.sin(t * 0.25) * 8;
+    if (player.weapon && attackFx > 0) {
+      const swing = ((attackFx / 12) * Math.PI * 1.3) * player.facing;
+      ctx.save();
+      ctx.translate(px + player.facing * 6, py + 3);
+      ctx.rotate(swing);
+      ctx.shadowColor = player.weapon.color; ctx.shadowBlur = 12;
+      drawWeaponShape(player.weapon, 0.7);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#334466';
+      ctx.save(); ctx.translate(px - 7, py + 2); ctx.rotate(-armSwing * Math.PI/180); ctx.fillRect(-5,0,5,11); ctx.restore();
+      ctx.save(); ctx.translate(px + 7, py + 2); ctx.rotate(armSwing * Math.PI/180); ctx.fillRect(0,0,5,11); ctx.restore();
+      if (player.weapon) {
+        ctx.save(); ctx.translate(px + player.facing * 12, py + 4); ctx.rotate(Math.PI/6 * player.facing); drawWeaponShape(player.weapon, 0.55); ctx.restore();
+      }
+    }
+
+    // head
+    ctx.fillStyle = '#e8c9a0'; ctx.fillRect(px - 6, py - 14, 12, 14);
+    ctx.fillStyle = '#1a0a00';
+    ctx.fillRect(px - 4 + player.facing*1, py - 11, 3, 3);
+    ctx.fillRect(px + 1 + player.facing*1, py - 11, 3, 3);
+    ctx.fillStyle = '#2a1800'; ctx.fillRect(px - 6, py - 14, 12, 4);
+  }
+
+  // ── Drawing: attack arc ────────────────────────────────────────────
+  function drawAttackArc() {
+    if (!player.weapon || attackFx <= 0) return;
+    const sx = player.x - camX, sy = player.y - camY;
+    const prog = attackFx / 12;
+    const range = Math.min(player.weapon.range, 140);
+    const arc = Math.PI * 0.8;
+    ctx.save();
+    ctx.globalAlpha = prog * 0.35;
+    ctx.fillStyle = player.weapon.color;
+    ctx.shadowColor = player.weapon.color; ctx.shadowBlur = 20;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.arc(sx, sy, range * (1.2 - prog), attackAngle - arc/2, attackAngle + arc/2);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Drawing: pumpkin ───────────────────────────────────────────────
+  function drawPumpkin(p) {
+    const sx = p.x - camX, sy = p.y - camY;
+    if (sx < -90 || sx > W + 90 || sy < -90 || sy > H + 90) return;
+    const bob = Math.sin(p.wob * 0.04) * 6;
+    const tilt = Math.sin(p.wob * 0.025) * 8;
+    const hpR = p.hp / p.maxHp;
+
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.translate(sx, sy + bob);
+    ctx.rotate(tilt * Math.PI/180);
+    if (p.flash > 0) { ctx.shadowColor = '#ff2222'; ctx.shadowBlur = 28 * (p.flash/10); }
+
+    // glow
+    const glowR = 55 + Math.sin(frame * 0.08) * 8;
+    const g = ctx.createRadialGradient(0,0,5,0,0,glowR);
+    g.addColorStop(0, hslA(biome.pumpkinHue, 80, 60, 0.25));
+    g.addColorStop(1, 'rgba(0,0,40,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,glowR,0,Math.PI*2); ctx.fill();
+
+    // horns (black)
+    ctx.fillStyle = '#111'; ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+    const hw = Math.sin(p.horn * 0.03) * 2;
+    ctx.save(); ctx.translate(-17, -22); ctx.rotate((-15 + hw) * Math.PI/180);
+    ctx.beginPath(); ctx.moveTo(-5,16); ctx.lineTo(0,-16); ctx.lineTo(5,16); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.translate(17, -22); ctx.rotate((15 - hw) * Math.PI/180);
+    ctx.beginPath(); ctx.moveTo(-5,16); ctx.lineTo(0,-16); ctx.lineTo(5,16); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+
+    // body (white, biome-tinted, reddens with damage)
+    const dmg = Math.floor((1 - hpR) * 60);
+    for (let i = 0; i < 5; i++) {
+      const segX = (i - 2) * 10;
+      const sw = 14 - Math.abs(i-2) * 1.5, sh = 25 - Math.abs(i-2) * 2;
+      const sg = ctx.createRadialGradient(segX-3, -6, 2, segX, 0, sw + 4);
+      sg.addColorStop(0, hsl(biome.pumpkinHue + dmg, 60, 92 - dmg/3));
+      sg.addColorStop(0.6, biome.pumpkinColor);
+      sg.addColorStop(1, hsl(biome.pumpkinHue, 40, 55));
+      ctx.fillStyle = sg;
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.ellipse(segX, 0, sw, sh, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    }
+    // stem
+    ctx.fillStyle = '#2a1a0a'; ctx.fillRect(-3, -25, 6, 8);
+
+    // carved face
+    ctx.fillStyle = hsl(biome.pumpkinHue, 90, 30);
+    ctx.shadowColor = biome.pumpkinColor; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.moveTo(-13,-7); ctx.lineTo(-7,-15); ctx.lineTo(-1,-7); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(1,-7); ctx.lineTo(7,-15); ctx.lineTo(13,-7); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-13,6); ctx.lineTo(-9,13); ctx.lineTo(-5,6); ctx.lineTo(-1,11);
+    ctx.lineTo(1,6); ctx.lineTo(5,13); ctx.lineTo(9,6); ctx.lineTo(13,6);
+    ctx.lineTo(11,16); ctx.lineTo(-11,16); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // blue flame on top
+    drawFlame(0, -26);
+    ctx.restore();
+
+    // hp bar
+    if (!p.dead) {
+      const bw = 50, bh = 6, bx = sx - bw/2, by = sy + bob - 52;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(bx-1, by-1, bw+2, bh+2);
+      ctx.fillStyle = '#330000'; ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = hpR > 0.5 ? '#66cc44' : (hpR > 0.25 ? '#ccaa22' : '#cc3322');
+      ctx.fillRect(bx, by, bw * hpR, bh);
+    }
+  }
+
+  function drawFlame(fx, fy) {
+    const t = frame;
+    const flick = Math.sin(t*0.15)*3 + Math.sin(t*0.23)*2;
+    const h = 26 + flick, w = 11 + Math.sin(t*0.1)*2;
+    const g1 = ctx.createRadialGradient(fx, fy-h*0.4, 1, fx, fy-h*0.3, w);
+    g1.addColorStop(0,'rgba(210,230,255,0.95)'); g1.addColorStop(0.4,'rgba(80,120,255,0.8)');
+    g1.addColorStop(0.8,'rgba(20,40,200,0.4)'); g1.addColorStop(1,'rgba(0,0,100,0)');
+    ctx.fillStyle = g1; ctx.shadowColor = '#4488ff'; ctx.shadowBlur = 16;
+    ctx.beginPath();
+    ctx.moveTo(fx-w*0.6, fy);
+    ctx.bezierCurveTo(fx-w, fy-h*0.3, fx-w*0.5, fy-h*0.7, fx+Math.sin(t*0.07)*3, fy-h);
+    ctx.bezierCurveTo(fx+w*0.5, fy-h*0.7, fx+w, fy-h*0.3, fx+w*0.6, fy);
+    ctx.closePath(); ctx.fill();
+    const g2 = ctx.createRadialGradient(fx, fy-h*0.35, 1, fx, fy-h*0.3, w*0.5);
+    g2.addColorStop(0,'rgba(255,255,255,0.95)'); g2.addColorStop(1,'rgba(120,150,255,0)');
+    ctx.fillStyle = g2;
+    ctx.beginPath();
+    ctx.moveTo(fx-w*0.3, fy);
+    ctx.bezierCurveTo(fx-w*0.5, fy-h*0.4, fx-w*0.2, fy-h*0.75, fx, fy-h*0.85);
+    ctx.bezierCurveTo(fx+w*0.2, fy-h*0.75, fx+w*0.5, fy-h*0.4, fx+w*0.3, fy);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // ── Drawing: particles & ambient ───────────────────────────────────
+  function drawParticles() {
+    for (const p of particles) {
+      ctx.globalAlpha = p.life * 0.85;
+      if (p.kind === 'flame') { ctx.fillStyle = 'hsl(' + (210 + Math.random()*40) + ',100%,' + (70 + p.life*30) + '%)'; ctx.shadowColor = '#4488ff'; ctx.shadowBlur = 8; }
+      else { ctx.fillStyle = p.color || '#fff'; ctx.shadowColor = p.color || '#fff'; ctx.shadowBlur = 6; }
+      ctx.beginPath(); ctx.arc(p.x - camX, p.y - camY, p.size * p.life, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  }
+
+  function updateAmbient() {
+    const k = biome.ambient;
+    if (k === 'snow' && Math.random() < 0.3) ambientP.push({ x: camX + Math.random()*W, y: camY - 10, vx: (Math.random()-0.5)*0.3, vy: 0.8 + Math.random()*0.5, life: 1, kind: 'snow' });
+    else if (k === 'ember' && Math.random() < 0.15) ambientP.push({ x: camX + Math.random()*W, y: camY + H + 10, vx: (Math.random()-0.5)*0.5, vy: -1 - Math.random()*1.4, life: 1, kind: 'ember' });
+    else if (k === 'spirit' && Math.random() < 0.07) ambientP.push({ x: camX + Math.random()*W, y: camY + Math.random()*H, vx: (Math.random()-0.5)*0.4, vy: -0.3 - Math.random()*0.3, life: 1, kind: 'spirit' });
+    else if (k === 'rain' && Math.random() < 0.5) ambientP.push({ x: camX + Math.random()*W, y: camY - 10, vx: -1, vy: 7, life: 1, kind: 'rain' });
+    else if (k === 'dust' && Math.random() < 0.12) ambientP.push({ x: camX + Math.random()*W, y: camY + Math.random()*H, vx: (Math.random()-0.3)*0.6, vy: (Math.random()-0.5)*0.2, life: 1, kind: 'dust' });
+    for (const p of ambientP) { p.x += p.vx; p.y += p.vy; p.life -= 0.006; }
+    for (let i = ambientP.length - 1; i >= 0; i--) if (ambientP[i].life <= 0) ambientP.splice(i, 1);
+  }
+
+  function drawAmbient() {
+    for (const p of ambientP) {
+      const sx = p.x - camX, sy = p.y - camY;
+      ctx.globalAlpha = p.life * 0.7;
+      if (p.kind === 'snow') { ctx.fillStyle = '#ddeeff'; ctx.beginPath(); ctx.arc(sx, sy, 2, 0, Math.PI*2); ctx.fill(); }
+      else if (p.kind === 'ember') { ctx.fillStyle = 'hsl(' + (20+Math.random()*20) + ',100%,' + (50+p.life*30) + '%)'; ctx.shadowColor = '#ff4400'; ctx.shadowBlur = 6; ctx.beginPath(); ctx.arc(sx, sy, 2, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; }
+      else if (p.kind === 'spirit') { const g = ctx.createRadialGradient(sx,sy,0,sx,sy,8); g.addColorStop(0,'rgba(180,80,255,0.6)'); g.addColorStop(1,'rgba(80,0,180,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx,sy,8,0,Math.PI*2); ctx.fill(); }
+      else if (p.kind === 'rain') { ctx.strokeStyle = 'rgba(150,180,220,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx-2,sy+8); ctx.stroke(); }
+      else if (p.kind === 'dust') { ctx.fillStyle = 'rgba(150,130,90,0.5)'; ctx.beginPath(); ctx.arc(sx,sy,1.5,0,Math.PI*2); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  }
+
+  // ── Drawing: overlay & HUD ─────────────────────────────────────────
+  function drawOverlay() {
+    const b = biome;
+    const g = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.85);
+    g.addColorStop(0, 'rgba(' + b.overlayR + ',' + b.overlayG + ',' + b.overlayB + ',0)');
+    g.addColorStop(1, 'rgba(' + b.overlayR + ',' + b.overlayG + ',' + b.overlayB + ',' + b.overlayA + ')');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawHUD() {
+    const elapsed = Date.now() - startTime;
+    const secs = Math.floor(elapsed / 1000), mins = Math.floor(secs / 60), s = (secs % 60).toString().padStart(2, '0');
+
+    // time
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(8, 8, 130, 28);
+    ctx.fillStyle = '#8899cc'; ctx.font = '14px Georgia'; ctx.textAlign = 'left';
+    ctx.fillText('⏱ ' + mins + ':' + s, 16, 27);
+
+    // danger
+    const alive = pumpkins.filter(p => !p.dead);
+    let minD = 9999;
+    for (const p of alive) { const d = Math.hypot(p.x - player.x, p.y - player.y); if (d < minD) minD = d; }
+    const danger = Math.max(0, 1 - minD / 300);
+    ctx.fillStyle = 'rgba(' + Math.floor(danger*255) + ',0,' + Math.floor((1-danger)*100) + ',0.7)';
+    ctx.fillRect(W-148, 8, 140, 28);
+    ctx.fillStyle = '#ccaaff'; ctx.font = '13px Georgia';
+    ctx.fillText(minD < 70 ? '⚠ SIE SIND NAH!' : (minD < 150 ? '👁 Vorsicht!' : '🌑 Sicher...'), W-140, 27);
+
+    // wave + kills
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(W/2-90, 8, 180, 28);
+    ctx.fillStyle = '#ffcc44'; ctx.font = '13px Georgia'; ctx.textAlign = 'center';
+    ctx.fillText(biome.emoji + ' Welle ' + wave + '/' + MAX_WAVE + ' · 💀' + totalKills, W/2, 27);
+
+    if (alive.length > 0) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(W/2-55, 40, 110, 20);
+      ctx.fillStyle = '#ff8888'; ctx.font = '12px Georgia';
+      ctx.fillText(alive.length + ' Kürbis' + (alive.length > 1 ? 'se' : '') + ' übrig', W/2, 55);
+    }
+    ctx.textAlign = 'left';
+
+    // weapon slot
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(8, H-46, 200, 38);
+    ctx.strokeStyle = player.weapon ? player.weapon.color : '#333'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(8, H-46, 200, 38);
+    if (player.weapon) {
+      ctx.fillStyle = player.weapon.color; ctx.font = '13px Georgia';
+      ctx.fillText(player.weapon.icon + ' ' + player.weapon.name, 16, H-28);
+      if (player.cd > 0 && player.weapon.cooldown > 0) {
+        ctx.fillStyle = '#334'; ctx.fillRect(16, H-20, 184, 7);
+        ctx.fillStyle = '#4488ff'; ctx.fillRect(16, H-20, 184 * (1 - player.cd / player.weapon.cooldown), 7);
+      } else {
+        ctx.fillStyle = '#88ff88'; ctx.font = '11px Georgia'; ctx.fillText('LEERTASTE = Angriff', 16, H-14);
+      }
+    } else {
+      ctx.fillStyle = '#667'; ctx.font = '12px Georgia';
+      ctx.fillText('Keine Waffe — lauf über eine!', 16, H-22);
+    }
+
+    // damage texts
+    for (const h of hitTexts) {
+      ctx.globalAlpha = Math.min(1, h.life);
+      if (h.big) {
+        ctx.fillStyle = '#fff'; ctx.shadowColor = '#aaf'; ctx.shadowBlur = 16;
+        ctx.font = 'bold 26px Georgia'; ctx.textAlign = 'center';
+        ctx.fillText('☠', h.x - camX, h.y - camY);
+        ctx.font = 'bold 13px Georgia'; ctx.fillStyle = '#fdf';
+        ctx.fillText('INSTANT KILL', h.x - camX, h.y - camY + 16);
+        ctx.textAlign = 'left';
+      } else {
+        ctx.fillStyle = '#ff5555'; ctx.shadowColor = '#f00'; ctx.shadowBlur = 6;
+        ctx.font = 'bold 14px Georgia';
+        ctx.fillText('-' + h.dmg, h.x - camX, h.y - camY);
+      }
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+
+    // wave banner
+    if (waveBanner.timer > 0) {
+      const a = Math.min(1, waveBanner.timer / 25);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(W/2-170, H/2-26, 340, 46);
+      ctx.strokeStyle = biome.pumpkinColor; ctx.lineWidth = 1.5; ctx.strokeRect(W/2-170, H/2-26, 340, 46);
+      ctx.fillStyle = biome.pumpkinColor; ctx.font = 'bold 18px Georgia'; ctx.textAlign = 'center';
+      ctx.fillText(waveBanner.text, W/2, H/2+4);
+      ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+      waveBanner.timer--;
+    }
+
+    // wave progress bar
+    const pbW = 180, pbX = (W - pbW)/2, pbY = H - 24;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(pbX-2, pbY-2, pbW+4, 14);
+    ctx.fillStyle = '#222'; ctx.fillRect(pbX, pbY, pbW, 10);
+    ctx.fillStyle = biome.pumpkinColor; ctx.fillRect(pbX, pbY, pbW * (wave / MAX_WAVE), 10);
+  }
+
+  // ── Game flow ──────────────────────────────────────────────────────
+  function startGame() {
+    cancelAnimationFrame(rafId);
+    document.getElementById('startScreen').classList.remove('show');
+    document.getElementById('gameOver').classList.remove('show');
+    document.getElementById('winScreen').classList.remove('show');
+    buildMap();
+    const sp = findSpawn();
+    player = { x: sp.x, y: sp.y, facing: 1, step: 0, weapon: null, cd: 0 };
+    pumpkins = []; particles = []; hitTexts = []; ambientP = [];
+    spawnWeapons();
+    keys = {};
+    wave = 0; totalKills = 0; waveKills = 0;
+    screenFlash = 0; attackFx = 0; frame = 0;
+    camX = player.x - W/2; camY = player.y - H/2;
+    startTime = Date.now();
+    running = true;
+    spawnWave(1);
+    try { canvas.focus(); } catch (e) {}
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function endGame(won) {
+    running = false;
+    cancelAnimationFrame(rafId);
+    const elapsed = Date.now() - startTime;
+    const secs = Math.floor(elapsed / 1000), mins = Math.floor(secs / 60), s = (secs % 60).toString().padStart(2, '0');
+    if (won) {
+      document.getElementById('winInfo').textContent = 'Zeit: ' + mins + ':' + s + ' · 💀 ' + totalKills + ' Kürbisse getötet';
+      document.getElementById('winScreen').classList.add('show');
+    } else {
+      document.getElementById('goInfo').textContent = 'Welle ' + wave + ' · 💀 ' + totalKills + ' getötet · Zeit ' + mins + ':' + s;
+      document.getElementById('gameOver').classList.add('show');
+    }
+  }
+
+  // ── Update ─────────────────────────────────────────────────────────
+  function update() {
+    frame++;
+
+    // movement
+    const spd = 3.0;
+    let dx = 0, dy = 0;
+    if (keys['arrowleft'] || keys['a']) dx -= 1;
+    if (keys['arrowright'] || keys['d']) dx += 1;
+    if (keys['arrowup'] || keys['w']) dy -= 1;
+    if (keys['arrowdown'] || keys['s']) dy += 1;
+    if (dx !== 0 || dy !== 0) {
+      const len = Math.hypot(dx, dy);
+      dx = dx / len * spd; dy = dy / len * spd;
+      player.step += 1.5;
+      if (dx !== 0) player.facing = dx > 0 ? 1 : -1;
+      // axis-separated collision
+      const hw = 8, fy = 22;
+      if (!solidAt(player.x + dx - hw, player.y + fy) && !solidAt(player.x + dx + hw, player.y + fy) &&
+          !solidAt(player.x + dx - hw, player.y + 6) && !solidAt(player.x + dx + hw, player.y + 6)) {
+        player.x += dx;
+      }
+      if (!solidAt(player.x - hw, player.y + dy + fy) && !solidAt(player.x + hw, player.y + dy + fy) &&
+          !solidAt(player.x - hw, player.y + dy + 6) && !solidAt(player.x + hw, player.y + dy + 6)) {
+        player.y += dy;
+      }
+      player.x = Math.max(8, Math.min(MAP_W * TILE - 8, player.x));
+      player.y = Math.max(8, Math.min(MAP_H * TILE - 8, player.y));
+    }
+
+    // weapon pickup
+    for (let i = weapons.length - 1; i >= 0; i--) {
+      if (Math.hypot(weapons[i].x - player.x, weapons[i].y - player.y) < 28) {
+        player.weapon = weapons[i].type;
+        player.cd = 0;
+        weapons.splice(i, 1);
+      }
+    }
+
+    // attack
+    if (player.cd > 0) player.cd--;
+    const alive = pumpkins.filter(p => !p.dead);
+    if ((keys[' '] || keys['space']) && player.weapon && player.cd === 0 && alive.length > 0) {
+      // nearest pumpkin for aim
+      let nearest = alive[0], nd = Infinity;
+      for (const p of alive) { const d = Math.hypot(p.x - player.x, p.y - player.y); if (d < nd) { nd = d; nearest = p; } }
+      attackFx = 12;
+      attackAngle = Math.atan2(nearest.y - player.y, nearest.x - player.x);
+      player.cd = player.weapon.cooldown;
+      const oneShot = !!player.weapon.oneshot;
+      const reach = oneShot ? 99999 : player.weapon.range + 12;
+      for (const p of alive) {
+        if (Math.hypot(p.x - player.x, p.y - player.y) <= reach) {
+          p.hp -= player.weapon.damage;
+          p.flash = 10;
+          hitParticles(p.x, p.y, player.weapon.color);
+          if (oneShot) {
+            hitParticles(p.x, p.y, '#ffffff');
+            hitTexts.push({ x: p.x, y: p.y - 28, big: true, life: 1.4 });
+          } else {
+            hitTexts.push({ x: p.x + (Math.random()-0.5)*16, y: p.y - 28, dmg: player.weapon.damage, life: 1 });
+          }
+          const ang = Math.atan2(p.y - player.y, p.x - player.x);
+          const kb = oneShot ? 12 : 5;
+          p.vx += Math.cos(ang) * kb; p.vy += Math.sin(ang) * kb;
+          if (p.hp <= 0) p.hp = 0;
+        }
+      }
+      if (oneShot) screenFlash = 18;
+    }
+    if (attackFx > 0) attackFx--;
+
+    // camera
+    camX += (player.x - W/2 - camX) * 0.12;
+    camY += (player.y - H/2 - camY) * 0.12;
+
+    // pumpkins
+    const chase = 0.85 + Math.min(2.5, wave / 40) * 1.0;
+    for (const p of pumpkins) {
+      p.wob++; p.horn++; if (p.flash > 0) p.flash--;
+      if (p.appearing) { p.alpha += 0.015; if (p.alpha >= 1) { p.alpha = 1; p.appearing = false; } }
+      if (!p.dead) {
+        const ddx = player.x - p.x, ddy = player.y - p.y, d = Math.hypot(ddx, ddy);
+        if (d > 5) { p.vx += (ddx/d) * chase * 0.06; p.vy += (ddy/d) * chase * 0.06; }
+        p.vx *= 0.93; p.vy *= 0.93;
+        p.vx += (Math.random()-0.5) * 0.15; p.vy += (Math.random()-0.5) * 0.15;
+        p.x += p.vx; p.y += p.vy;
+        p.x = Math.max(20, Math.min(MAP_W*TILE-20, p.x));
+        p.y = Math.max(20, Math.min(MAP_H*TILE-20, p.y));
+        if (frame % 4 === 0) flameParticles(p.x, p.y - 36);
+        if (d < 30) { endGame(false); return; }
+        if (p.hp <= 0) {
+          p.dead = true; totalKills++; waveKills++;
+          hitParticles(p.x, p.y, biome.pumpkinColor);
+          hitParticles(p.x, p.y, '#ffffff');
+        }
+      } else {
+        p.alpha -= 0.04;
+      }
+    }
+    for (let i = pumpkins.length - 1; i >= 0; i--) if (pumpkins[i].dead && pumpkins[i].alpha <= 0) pumpkins.splice(i, 1);
+
+    // next wave?
+    if (pumpkins.length === 0) {
+      if (wave >= MAX_WAVE) { endGame(true); return; }
+      spawnWave(wave + 1);
+    }
+
+    // particles
+    for (const p of particles) { p.x += p.vx; p.y += p.vy; p.life -= 0.025; }
+    for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
+    for (const h of hitTexts) { h.y -= 1; h.life -= 0.035; }
+    for (let i = hitTexts.length - 1; i >= 0; i--) if (hitTexts[i].life <= 0) hitTexts.splice(i, 1);
+    if (screenFlash > 0) screenFlash--;
+    updateAmbient();
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────
+  function render() {
+    ctx.fillStyle = biome.bg; ctx.fillRect(0, 0, W, H);
+    drawWorld();
+    drawAmbient();
+    drawWeapons();
+    drawParticles();
+    drawAttackArc();
+    drawPlayer();
+    for (const p of pumpkins) drawPumpkin(p);
+    drawOverlay();
+    if (screenFlash > 0) { ctx.globalAlpha = screenFlash / 18 * 0.6; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+    drawHUD();
+  }
+
+  // ── Loop ───────────────────────────────────────────────────────────
+  function loop() {
+    if (!running) return;
+    update();
+    if (!running) return; // endGame may have stopped us
+    render();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  // ── Input ──────────────────────────────────────────────────────────
+  function keyName(e) {
+    return (e.key === ' ') ? ' ' : e.key.toLowerCase();
+  }
+  window.addEventListener('keydown', function (e) {
+    const k = keyName(e);
+    if (running && ['arrowleft','arrowright','arrowup','arrowdown',' '].includes(k)) e.preventDefault();
+    keys[k] = true;
+  });
+  window.addEventListener('keyup', function (e) { keys[keyName(e)] = false; });
+  canvas.addEventListener('mousedown', function () { try { canvas.focus(); } catch (e) {} });
+
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('retryBtn').addEventListener('click', startGame);
+  document.getElementById('playAgainBtn').addEventListener('click', startGame);
+
+  // draw a static preview behind start screen
+  biome = generateBiome(1);
+  ctx.fillStyle = biome.bg; ctx.fillRect(0, 0, W, H);
+})();
 </script>
 </body>
 </html>
