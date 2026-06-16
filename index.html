@@ -6,7 +6,7 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Georgia', serif; }
-  canvas { border: 2px solid #1a0a2e; display: block; }
+  canvas { border: 2px solid #1a0a2e; display: block; outline: none; }
   #ui { color: #8888cc; text-align: center; margin-top: 8px; font-size: 13px; letter-spacing: 1px; }
   .overlay-screen {
     position: absolute; display: none; flex-direction: column; align-items: center; justify-content: center;
@@ -36,7 +36,7 @@
 </head>
 <body>
 <div style="position:relative">
-  <canvas id="c" width="800" height="550"></canvas>
+  <canvas id="c" width="800" height="550" tabindex="0"></canvas>
 
   <div id="startScreen" class="overlay-screen">
     <h1>☽ Der Kürbis-Geist ☾</h1>
@@ -146,7 +146,7 @@ const WEAPON_TYPES = [
   { id:'oneshot', name:'HEILIGE SENSE', damage:99999, range:120, cooldown:0, color:'#ffffff', icon:'☠️', oneshot:true },
 ];
 
-let worldMap=[], player, pumpkins=[], keys={}, gameActive=false;
+let worldMap=[], player, pumpkins=[], keys={}, gameActive=false, loopId=0;
 let startTime, particles=[], camX=0, camY=0, flickerT=0;
 let weaponPickups=[], hitEffects=[], attackAnim=0, attackAngle=0;
 let wave=0, killed=0, totalKilled=0, screenFlash=0;
@@ -536,18 +536,24 @@ function startGame(){
 }
 
 function initGame(){
+  cancelAnimationFrame(loopId);
   buildMap();spawnWeapons();
   player={x:25*TILE,y:19*TILE,facing:1,step:0,weapon:null,attackCooldown:0};
   pumpkins=[];particles=[];hitEffects=[];ambientParticles=[];
   attackAnim=0;wave=0;killed=0;screenFlash=0;
-  keys={};gameActive=true;startTime=Date.now();
+  keys={};gameActive=true;startTime=Date.now();lastT=0;
   camX=player.x-W/2;camY=player.y-H/2;
+  canvas.focus();
   spawnWave(1);
-  requestAnimationFrame(loop);
+  loopId=requestAnimationFrame(loop);
 }
 
-document.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();keys[e.key]=true;});
-document.addEventListener('keyup',e=>{keys[e.key]=false;});
+window.addEventListener('keydown',e=>{
+  if(gameActive&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();
+  keys[e.key]=true;
+});
+window.addEventListener('keyup',e=>{keys[e.key]=false;});
+canvas.addEventListener('click',()=>canvas.focus());
 
 // ── Main Loop ──────────────────────────────────────────────────────────
 let lastT=0;
@@ -658,7 +664,7 @@ function loop(ts){
   drawNightOverlay();
   drawHUD(elapsed);
 
-  requestAnimationFrame(loop);
+  loopId=requestAnimationFrame(loop);
 }
 </script>
 </body>
