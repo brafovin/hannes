@@ -12,12 +12,13 @@
     position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
     width: 800px; height: 550px; background: rgba(0,0,0,0.92); color: #ddd;
   }
-  #startScreen h1 { font-size: 42px; color: #aaa9ff; text-shadow: 0 0 20px #6666ff; margin-bottom: 16px; }
-  #startScreen p { font-size: 15px; color: #9999bb; margin-bottom: 8px; }
+  #startScreen h1 { font-size: 38px; color: #aaa9ff; text-shadow: 0 0 20px #6666ff; margin-bottom: 12px; }
+  #startScreen p { font-size: 14px; color: #9999bb; margin-bottom: 6px; }
+  #startScreen .controls { margin-top:14px; background:#0a0a1a; padding:12px 24px; border:1px solid #333; }
+  #startScreen .controls p { color:#7788aa; font-size:13px; margin-bottom:4px; }
   #startScreen button {
-    margin-top: 24px; padding: 12px 36px; font-size: 18px; background: #1a0a2e;
-    color: #aaa9ff; border: 2px solid #6644aa; cursor: pointer; letter-spacing: 2px;
-    transition: all 0.2s;
+    margin-top: 20px; padding: 12px 36px; font-size: 18px; background: #1a0a2e;
+    color: #aaa9ff; border: 2px solid #6644aa; cursor: pointer; letter-spacing: 2px; transition: all 0.2s;
   }
   #startScreen button:hover { background: #2a1a4e; box-shadow: 0 0 20px #6644aa; }
   #gameOver {
@@ -31,6 +32,17 @@
     color: #ff8888; border: 2px solid #aa2222; cursor: pointer; letter-spacing: 2px;
   }
   #gameOver button:hover { background: #2a0000; box-shadow: 0 0 20px #aa2222; }
+  #winScreen {
+    position: absolute; display: none; flex-direction: column; align-items: center; justify-content: center;
+    width: 800px; height: 550px; background: rgba(0,0,0,0.9); color: #ddd;
+  }
+  #winScreen h1 { font-size: 48px; color: #88ffaa; text-shadow: 0 0 30px #00ff88; margin-bottom: 16px; }
+  #winScreen p { font-size: 16px; color: #aaccaa; margin-bottom: 8px; }
+  #winScreen button {
+    margin-top: 24px; padding: 12px 36px; font-size: 18px; background: #001a00;
+    color: #88ffaa; border: 2px solid #22aa44; cursor: pointer; letter-spacing: 2px;
+  }
+  #winScreen button:hover { background: #002a00; box-shadow: 0 0 20px #22aa44; }
 </style>
 </head>
 <body>
@@ -40,8 +52,12 @@
     <h1>☽ Der Kürbis-Geist ☾</h1>
     <p>Du wanderst allein durch das Dorf in der Nacht...</p>
     <p>Plötzlich erscheint er — der weiße Kürbis-Geist.</p>
-    <p style="margin-top:12px; color:#6677aa">Lauf weg! Komm ihm nicht zu nah!</p>
-    <p style="color:#554466; font-size:13px; margin-top:8px">WASD oder Pfeiltasten zum Bewegen</p>
+    <div class="controls">
+      <p>🎮 <b>WASD</b> oder Pfeiltasten — Bewegen</p>
+      <p>⚔️ <b>LEERTASTE</b> — Angreifen (wenn Waffe ausgerüstet)</p>
+      <p>🗡️ Laufe über Waffen um sie aufzuheben</p>
+      <p>💀 Töte den Kürbis bevor er dich erwischt!</p>
+    </div>
     <button onclick="startGame()">SPIEL STARTEN</button>
   </div>
   <div id="gameOver">
@@ -50,55 +66,43 @@
     <p id="surviveTime" style="color:#ffaa88; font-size:18px; margin-top:8px"></p>
     <button onclick="startGame()">NOCHMAL VERSUCHEN</button>
   </div>
+  <div id="winScreen">
+    <h1>✨ SIEG! ✨</h1>
+    <p>Du hast den Kürbis-Geist besiegt!</p>
+    <p id="winTime" style="color:#88ffcc; font-size:18px; margin-top:8px"></p>
+    <button onclick="startGame()">NOCHMAL SPIELEN</button>
+  </div>
 </div>
-<div id="ui">WASD / Pfeiltasten — Überlebe so lange wie möglich!</div>
+<div id="ui">WASD bewegen · LEERTASTE angreifen · Waffen aufsammeln und den Kürbis besiegen!</div>
 
 <script>
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const W = 800, H = 550;
 
-// ── Tile ──────────────────────────────────────────────────────────────
 const TILE = 40;
 const COLS = Math.ceil(W / TILE) + 2;
 const ROWS = Math.ceil(H / TILE) + 2;
-
-// map: 0=path, 1=house, 2=tree, 3=fence
 const MAP_W = 30, MAP_H = 22;
 let worldMap = [];
 
+// ── Weapon definitions ─────────────────────────────────────────────────
+const WEAPON_TYPES = [
+  { id: 'sword',  name: 'Schwert',    damage: 25, range: 55, cooldown: 40, color: '#aaddff', icon: '🗡️' },
+  { id: 'axe',    name: 'Axt',        damage: 40, range: 45, cooldown: 65, color: '#ffaa44', icon: '🪓' },
+  { id: 'staff',  name: 'Zauberstab', damage: 18, range: 90, cooldown: 30, color: '#dd88ff', icon: '🪄' },
+  { id: 'hammer', name: 'Hammer',     damage: 55, range: 40, cooldown: 80, color: '#ff8844', icon: '🔨' },
+];
+
 function buildMap() {
   worldMap = [];
-  for (let r = 0; r < MAP_H; r++) {
-    worldMap[r] = [];
-    for (let c = 0; c < MAP_W; c++) {
-      worldMap[r][c] = 0;
-    }
-  }
-  // houses
-  const houses = [
-    [1,1],[1,7],[1,14],[1,19],
-    [8,2],[8,10],[8,17],
-    [14,1],[14,8],[14,15],[14,21],
-    [18,3],[18,12],[18,19],
-  ];
-  for (const [r,c] of houses) {
-    for (let dr = 0; dr < 3; dr++)
-      for (let dc = 0; dc < 4; dc++)
-        if (r+dr < MAP_H && c+dc < MAP_W) worldMap[r+dr][c+dc] = 1;
-  }
-  // trees
-  const trees = [
-    [0,0],[0,6],[0,11],[0,17],[0,24],[0,28],
-    [5,5],[5,13],[5,20],[5,27],
-    [11,0],[11,6],[11,13],[11,24],[11,28],
-    [17,0],[17,8],[17,14],[17,26],
-    [21,2],[21,9],[21,16],[21,22],[21,27],
-  ];
-  for (const [r,c] of trees) {
-    if (r < MAP_H && c < MAP_W) worldMap[r][c] = 2;
-  }
-  // fences along some rows
+  for (let r = 0; r < MAP_H; r++) { worldMap[r] = []; for (let c = 0; c < MAP_W; c++) worldMap[r][c] = 0; }
+  const houses = [[1,1],[1,7],[1,14],[1,19],[8,2],[8,10],[8,17],[14,1],[14,8],[14,15],[14,21],[18,3],[18,12],[18,19]];
+  for (const [r,c] of houses)
+    for (let dr = 0; dr < 3; dr++) for (let dc = 0; dc < 4; dc++)
+      if (r+dr < MAP_H && c+dc < MAP_W) worldMap[r+dr][c+dc] = 1;
+  const trees = [[0,0],[0,6],[0,11],[0,17],[0,24],[0,28],[5,5],[5,13],[5,20],[5,27],[11,0],[11,6],[11,13],[11,24],[11,28],[17,0],[17,8],[17,14],[17,26],[21,2],[21,9],[21,16],[21,22],[21,27]];
+  for (const [r,c] of trees) if (r < MAP_H && c < MAP_W) worldMap[r][c] = 2;
   for (let c = 0; c < MAP_W; c++) {
     if (worldMap[6][c] === 0) worldMap[6][c] = 3;
     if (worldMap[13][c] === 0) worldMap[13][c] = 3;
@@ -106,29 +110,57 @@ function buildMap() {
 }
 
 function isSolid(mx, my) {
-  const c = Math.floor(mx / TILE);
-  const r = Math.floor(my / TILE);
+  const c = Math.floor(mx / TILE), r = Math.floor(my / TILE);
   if (r < 0 || r >= MAP_H || c < 0 || c >= MAP_W) return true;
   return worldMap[r][c] === 1 || worldMap[r][c] === 2;
 }
 
-// ── State ─────────────────────────────────────────────────────────────
+// ── State ──────────────────────────────────────────────────────────────
 let player, pumpkin, keys, gameActive, startTime, particles, camX, camY;
 let flickerT = 0;
+let weaponPickups = [];   // weapons on the ground
+let hitEffects = [];      // damage flash effects
+let attackAnim = 0;       // attack animation timer
+let attackAngle = 0;      // angle of swing
+let pumpkinHitFlash = 0;  // red flash when pumpkin is hit
+
+function spawnWeapons() {
+  weaponPickups = [];
+  const spots = [
+    [4*TILE, 3*TILE], [22*TILE, 4*TILE], [7*TILE, 9*TILE],
+    [20*TILE, 9*TILE], [3*TILE, 16*TILE], [25*TILE, 15*TILE],
+    [12*TILE, 19*TILE], [18*TILE, 20*TILE],
+  ];
+  for (let i = 0; i < spots.length; i++) {
+    const type = WEAPON_TYPES[i % WEAPON_TYPES.length];
+    weaponPickups.push({ x: spots[i][0], y: spots[i][1], type, bob: Math.random()*Math.PI*2 });
+  }
+}
 
 function startGame() {
   document.getElementById('startScreen').style.display = 'none';
   document.getElementById('gameOver').style.display = 'none';
+  document.getElementById('winScreen').style.display = 'none';
   buildMap();
-  player = { x: 15*TILE, y: 10*TILE, w: 20, h: 28, vx: 0, vy: 0, facing: 1, step: 0 };
+  spawnWeapons();
+  player = {
+    x: 15*TILE, y: 10*TILE, facing: 1, step: 0,
+    weapon: null,       // equipped weapon
+    attackCooldown: 0,  // frames until next attack
+  };
   pumpkin = {
     x: player.x + 300, y: player.y - 200,
     vx: 0, vy: 0,
     wobble: 0, appearing: true, alpha: 0,
-    flameT: 0, hornWobble: 0
+    flameT: 0, hornWobble: 0,
+    hp: 100, maxHp: 100,
+    dead: false,
   };
   keys = {};
   particles = [];
+  hitEffects = [];
+  attackAnim = 0;
+  pumpkinHitFlash = 0;
   gameActive = true;
   startTime = Date.now();
   camX = player.x - W/2;
@@ -136,69 +168,38 @@ function startGame() {
   requestAnimationFrame(loop);
 }
 
-// ── Input ─────────────────────────────────────────────────────────────
-document.addEventListener('keydown', e => { keys[e.key] = true; e.preventDefault(); });
-document.addEventListener('keyup',   e => { keys[e.key] = false; });
+document.addEventListener('keydown', e => {
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
+  keys[e.key] = true;
+});
+document.addEventListener('keyup', e => { keys[e.key] = false; });
 
-// ── Drawing helpers ───────────────────────────────────────────────────
+// ── Tile drawing ───────────────────────────────────────────────────────
 function drawTile(type, sx, sy) {
   if (type === 0) {
-    // cobblestone path
-    ctx.fillStyle = '#2a2420';
-    ctx.fillRect(sx, sy, TILE, TILE);
+    ctx.fillStyle = '#2a2420'; ctx.fillRect(sx, sy, TILE, TILE);
     ctx.fillStyle = '#332c28';
-    ctx.fillRect(sx+2, sy+2, 17, 17);
-    ctx.fillRect(sx+21, sy+21, 17, 17);
-    ctx.fillRect(sx+2, sy+22, 17, 15);
-    ctx.fillRect(sx+21, sy+2, 17, 17);
-    ctx.strokeStyle = '#1a1410';
-    ctx.lineWidth = 0.5;
-    ctx.strokeRect(sx+2, sy+2, 17, 17);
-    ctx.strokeRect(sx+21, sy+21, 17, 17);
-    ctx.strokeRect(sx+2, sy+22, 17, 15);
-    ctx.strokeRect(sx+21, sy+2, 17, 17);
+    ctx.fillRect(sx+2, sy+2, 17, 17); ctx.fillRect(sx+21, sy+21, 17, 17);
+    ctx.fillRect(sx+2, sy+22, 17, 15); ctx.fillRect(sx+21, sy+2, 17, 17);
+    ctx.strokeStyle = '#1a1410'; ctx.lineWidth = 0.5;
+    ctx.strokeRect(sx+2, sy+2, 17, 17); ctx.strokeRect(sx+21, sy+21, 17, 17);
+    ctx.strokeRect(sx+2, sy+22, 17, 15); ctx.strokeRect(sx+21, sy+2, 17, 17);
   } else if (type === 1) {
-    // house
-    ctx.fillStyle = '#3d2b1f';
-    ctx.fillRect(sx, sy, TILE, TILE);
-    ctx.fillStyle = '#5a3d2a';
-    ctx.fillRect(sx+2, sy+2, TILE-4, TILE-4);
-    // dark window
-    ctx.fillStyle = '#ffee88';
-    ctx.shadowColor = '#ffdd44';
-    ctx.shadowBlur = 6;
-    ctx.fillRect(sx+8, sy+10, 10, 8);
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#2a1a0a';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(sx+8, sy+10, 10, 8);
+    ctx.fillStyle = '#3d2b1f'; ctx.fillRect(sx, sy, TILE, TILE);
+    ctx.fillStyle = '#5a3d2a'; ctx.fillRect(sx+2, sy+2, TILE-4, TILE-4);
+    ctx.fillStyle = '#ffee88'; ctx.shadowColor = '#ffdd44'; ctx.shadowBlur = 6;
+    ctx.fillRect(sx+8, sy+10, 10, 8); ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#2a1a0a'; ctx.lineWidth = 1; ctx.strokeRect(sx+8, sy+10, 10, 8);
   } else if (type === 2) {
-    // tree
-    ctx.fillStyle = '#1a120c';
-    ctx.fillRect(sx+17, sy+24, 6, 16);
-    ctx.fillStyle = '#0d2b0d';
-    ctx.beginPath();
-    ctx.arc(sx+20, sy+16, 16, 0, Math.PI*2);
-    ctx.fill();
-    ctx.fillStyle = '#0a1f0a';
-    ctx.beginPath();
-    ctx.arc(sx+20, sy+8, 12, 0, Math.PI*2);
-    ctx.fill();
-    // subtle highlight
-    ctx.fillStyle = 'rgba(0,50,0,0.5)';
-    ctx.beginPath();
-    ctx.arc(sx+16, sy+14, 6, 0, Math.PI*2);
-    ctx.fill();
+    ctx.fillStyle = '#1a120c'; ctx.fillRect(sx+17, sy+24, 6, 16);
+    ctx.fillStyle = '#0d2b0d'; ctx.beginPath(); ctx.arc(sx+20, sy+16, 16, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#0a1f0a'; ctx.beginPath(); ctx.arc(sx+20, sy+8, 12, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,50,0,0.5)'; ctx.beginPath(); ctx.arc(sx+16, sy+14, 6, 0, Math.PI*2); ctx.fill();
   } else if (type === 3) {
-    // fence
-    ctx.fillStyle = '#2a2420';
-    ctx.fillRect(sx, sy, TILE, TILE);
+    ctx.fillStyle = '#2a2420'; ctx.fillRect(sx, sy, TILE, TILE);
     ctx.fillStyle = '#4a3828';
-    ctx.fillRect(sx+2, sy+14, TILE-4, 4);
-    ctx.fillRect(sx+2, sy+22, TILE-4, 4);
-    for (let i = 4; i < TILE-4; i+=8) {
-      ctx.fillRect(sx+i, sy+8, 4, 24);
-    }
+    ctx.fillRect(sx+2, sy+14, TILE-4, 4); ctx.fillRect(sx+2, sy+22, TILE-4, 4);
+    for (let i = 4; i < TILE-4; i+=8) ctx.fillRect(sx+i, sy+8, 4, 24);
   }
 }
 
@@ -207,412 +208,480 @@ function drawWorld() {
   const startR = Math.floor(camY / TILE) - 1;
   for (let r = startR; r < startR + ROWS + 2; r++) {
     for (let c = startC; c < startC + COLS + 2; c++) {
-      const sx = c * TILE - camX;
-      const sy = r * TILE - camY;
+      const sx = c*TILE - camX, sy = r*TILE - camY;
       if (r < 0 || r >= MAP_H || c < 0 || c >= MAP_W) {
-        ctx.fillStyle = '#0a0808';
-        ctx.fillRect(sx, sy, TILE, TILE);
-      } else {
-        drawTile(worldMap[r][c], sx, sy);
-      }
+        ctx.fillStyle = '#0a0808'; ctx.fillRect(sx, sy, TILE, TILE);
+      } else drawTile(worldMap[r][c], sx, sy);
     }
   }
 }
 
+// ── Weapon pickups on ground ───────────────────────────────────────────
+function drawWeaponPickups(t) {
+  for (const w of weaponPickups) {
+    const sx = w.x - camX, sy = w.y - camY;
+    if (sx < -40 || sx > W+40 || sy < -40 || sy > H+40) continue;
+    w.bob += 0.05;
+    const bob = Math.sin(w.bob) * 4;
+
+    // glow
+    ctx.shadowColor = w.type.color;
+    ctx.shadowBlur = 14;
+    // circle base
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.ellipse(sx, sy+8, 12, 5, 0, 0, Math.PI*2); ctx.fill();
+
+    // draw weapon shape
+    ctx.save();
+    ctx.translate(sx, sy + bob);
+    ctx.rotate(Math.PI / 5);
+    drawWeaponShape(w.type, 0, 0, 1.0);
+    ctx.restore();
+    ctx.shadowBlur = 0;
+
+    // label
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(sx-28, sy-34+bob, 56, 14);
+    ctx.fillStyle = w.type.color;
+    ctx.font = '11px Georgia';
+    ctx.textAlign = 'center';
+    ctx.fillText(w.type.name, sx, sy-23+bob);
+    ctx.textAlign = 'left';
+  }
+}
+
+function drawWeaponShape(type, ox, oy, scale) {
+  ctx.save();
+  ctx.scale(scale, scale);
+  if (type.id === 'sword') {
+    ctx.fillStyle = '#aaddff';
+    ctx.fillRect(ox-2, oy-20, 4, 36);
+    ctx.fillStyle = '#cccccc';
+    ctx.fillRect(ox-7, oy+12, 14, 4);
+    ctx.fillStyle = '#aa8833';
+    ctx.fillRect(ox-2, oy+16, 4, 8);
+    ctx.strokeStyle = '#ddeeff'; ctx.lineWidth = 0.5;
+    ctx.strokeRect(ox-2, oy-20, 4, 36);
+  } else if (type.id === 'axe') {
+    ctx.fillStyle = '#885522';
+    ctx.fillRect(ox-2, oy-18, 4, 34);
+    ctx.fillStyle = '#cc8833';
+    ctx.beginPath();
+    ctx.moveTo(ox-2, oy-18); ctx.lineTo(ox-14, oy-6); ctx.lineTo(ox-14, oy+6); ctx.lineTo(ox-2, oy-2);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#ffaa44'; ctx.lineWidth = 0.5; ctx.stroke();
+  } else if (type.id === 'staff') {
+    ctx.fillStyle = '#6633aa';
+    ctx.fillRect(ox-2, oy-22, 4, 40);
+    const g = ctx.createRadialGradient(ox, oy-22, 1, ox, oy-22, 8);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, '#cc88ff'); g.addColorStop(1, 'rgba(80,0,180,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(ox, oy-22, 9, 0, Math.PI*2); ctx.fill();
+  } else if (type.id === 'hammer') {
+    ctx.fillStyle = '#663322';
+    ctx.fillRect(ox-2, oy-18, 4, 36);
+    ctx.fillStyle = '#888888';
+    ctx.fillRect(ox-10, oy-18, 20, 14);
+    ctx.strokeStyle = '#aaaaaa'; ctx.lineWidth = 0.5;
+    ctx.strokeRect(ox-10, oy-18, 20, 14);
+  }
+  ctx.restore();
+}
+
+// ── Player drawing ─────────────────────────────────────────────────────
 function drawPlayer(sx, sy) {
   const t = player.step;
   const bob = Math.sin(t * 0.25) * 2;
   const legSwing = Math.sin(t * 0.25) * 5;
   const px = sx, py = sy + bob;
 
-  // shadow
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.beginPath();
-  ctx.ellipse(px, py+28, 10, 4, 0, 0, Math.PI*2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(px, py+28, 10, 4, 0, 0, Math.PI*2); ctx.fill();
 
-  // legs
   ctx.fillStyle = '#2244aa';
-  ctx.save();
-  ctx.translate(px - 4, py + 14);
-  ctx.rotate(legSwing * Math.PI/180);
-  ctx.fillRect(-3, 0, 6, 14);
-  ctx.restore();
-  ctx.save();
-  ctx.translate(px + 4, py + 14);
-  ctx.rotate(-legSwing * Math.PI/180);
-  ctx.fillRect(-3, 0, 6, 14);
-  ctx.restore();
+  ctx.save(); ctx.translate(px-4, py+14); ctx.rotate(legSwing*Math.PI/180); ctx.fillRect(-3,0,6,14); ctx.restore();
+  ctx.save(); ctx.translate(px+4, py+14); ctx.rotate(-legSwing*Math.PI/180); ctx.fillRect(-3,0,6,14); ctx.restore();
 
-  // body
-  ctx.fillStyle = '#334466';
-  ctx.fillRect(px-7, py+2, 14, 14);
+  ctx.fillStyle = '#334466'; ctx.fillRect(px-7, py+2, 14, 14);
 
-  // arms
-  ctx.fillStyle = '#334466';
   const armSwing = Math.sin(t * 0.25) * 8;
-  ctx.save();
-  ctx.translate(px-7, py+4);
-  ctx.rotate(-armSwing * Math.PI/180);
-  ctx.fillRect(-5, 0, 5, 11);
-  ctx.restore();
-  ctx.save();
-  ctx.translate(px+7, py+4);
-  ctx.rotate(armSwing * Math.PI/180);
-  ctx.fillRect(0, 0, 5, 11);
-  ctx.restore();
 
-  // head
-  ctx.fillStyle = '#e8c9a0';
-  ctx.fillRect(px-6, py-12, 12, 14);
-  // eyes
-  ctx.fillStyle = '#1a0a00';
-  ctx.fillRect(px-4, py-9, 3, 3);
-  ctx.fillRect(px+1, py-9, 3, 3);
-  // hair
-  ctx.fillStyle = '#2a1800';
-  ctx.fillRect(px-6, py-12, 12, 4);
+  // weapon arm (right side if facing right, left if facing left)
+  if (player.weapon && attackAnim > 0) {
+    const swingAngle = ((attackAnim / 15) * Math.PI * 1.2) * player.facing;
+    ctx.save();
+    ctx.translate(px + player.facing*6, py+5);
+    ctx.rotate(swingAngle);
+    ctx.shadowColor = player.weapon.color;
+    ctx.shadowBlur = 12;
+    drawWeaponShape(player.weapon, player.facing*10, -8, 0.7);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#334466';
+    ctx.save(); ctx.translate(px-7, py+4); ctx.rotate(-armSwing*Math.PI/180); ctx.fillRect(-5,0,5,11); ctx.restore();
+    ctx.save(); ctx.translate(px+7, py+4); ctx.rotate(armSwing*Math.PI/180); ctx.fillRect(0,0,5,11); ctx.restore();
+    // hold weapon idle
+    if (player.weapon) {
+      ctx.save();
+      ctx.translate(px + player.facing*12, py+6);
+      ctx.rotate(Math.PI/6 * player.facing);
+      drawWeaponShape(player.weapon, 0, 0, 0.55);
+      ctx.restore();
+    }
+  }
+
+  ctx.fillStyle = '#e8c9a0'; ctx.fillRect(px-6, py-12, 12, 14);
+  ctx.fillStyle = '#1a0a00'; ctx.fillRect(px-4, py-9, 3, 3); ctx.fillRect(px+1, py-9, 3, 3);
+  ctx.fillStyle = '#2a1800'; ctx.fillRect(px-6, py-12, 12, 4);
 }
 
+// ── Pumpkin drawing ────────────────────────────────────────────────────
 function drawPumpkin(t) {
-  const px = pumpkin.x - camX;
-  const py = pumpkin.y - camY;
+  const px = pumpkin.x - camX, py = pumpkin.y - camY;
   const bob = Math.sin(pumpkin.wobble * 0.04) * 6;
   const tilt = Math.sin(pumpkin.wobble * 0.025) * 8;
   const alpha = pumpkin.alpha;
+  const hpRatio = pumpkin.hp / pumpkin.maxHp;
 
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(px, py + bob);
-  ctx.rotate(tilt * Math.PI / 180);
+  ctx.rotate(tilt * Math.PI/180);
 
-  // Glow aura
-  const glowR = 60 + Math.sin(t * 0.08) * 10;
-  const grd = ctx.createRadialGradient(0, 0, 5, 0, 0, glowR);
-  grd.addColorStop(0, 'rgba(100,100,255,0.25)');
-  grd.addColorStop(1, 'rgba(0,0,80,0)');
-  ctx.fillStyle = grd;
-  ctx.beginPath();
-  ctx.arc(0, 0, glowR, 0, Math.PI*2);
-  ctx.fill();
-
-  // Shadow below
-  ctx.globalAlpha = alpha * 0.3;
-  ctx.fillStyle = '#000066';
-  ctx.beginPath();
-  ctx.ellipse(0, 36, 22, 8, 0, 0, Math.PI*2);
-  ctx.fill();
-  ctx.globalAlpha = alpha;
-
-  // ── BLACK HORNS ──
-  ctx.fillStyle = '#111111';
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 1;
-  const hw = Math.sin(pumpkin.hornWobble * 0.03) * 2;
-  // left horn
-  ctx.save();
-  ctx.translate(-18, -24);
-  ctx.rotate((-15 + hw) * Math.PI/180);
-  ctx.beginPath();
-  ctx.moveTo(-5, 18);
-  ctx.lineTo(0, -18);
-  ctx.lineTo(5, 18);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  // small tip
-  ctx.beginPath();
-  ctx.moveTo(-2, -16);
-  ctx.lineTo(0, -26);
-  ctx.lineTo(2, -16);
-  ctx.closePath();
-  ctx.fillStyle = '#222';
-  ctx.fill();
-  ctx.restore();
-
-  // right horn
-  ctx.save();
-  ctx.translate(18, -24);
-  ctx.rotate((15 - hw) * Math.PI/180);
-  ctx.fillStyle = '#111111';
-  ctx.beginPath();
-  ctx.moveTo(-5, 18);
-  ctx.lineTo(0, -18);
-  ctx.lineTo(5, 18);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(-2, -16);
-  ctx.lineTo(0, -26);
-  ctx.lineTo(2, -16);
-  ctx.closePath();
-  ctx.fillStyle = '#222';
-  ctx.fill();
-  ctx.restore();
-
-  // ── WHITE PUMPKIN BODY ──
-  const segments = 5;
-  for (let i = 0; i < segments; i++) {
-    const segX = (i - 2) * 10;
-    const sw = 14 - Math.abs(i-2)*1.5;
-    const sh = 26 - Math.abs(i-2)*2;
-    const grdSeg = ctx.createRadialGradient(segX-3, -6, 2, segX, 0, sw+4);
-    grdSeg.addColorStop(0, '#ffffff');
-    grdSeg.addColorStop(0.5, '#dde8ff');
-    grdSeg.addColorStop(1, '#aabbdd');
-    ctx.fillStyle = grdSeg;
-    ctx.strokeStyle = 'rgba(180,200,255,0.4)';
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.ellipse(segX, 0, sw, sh, 0, 0, Math.PI*2);
-    ctx.fill();
-    ctx.stroke();
+  // hit flash tint
+  if (pumpkinHitFlash > 0) {
+    ctx.shadowColor = '#ff2222';
+    ctx.shadowBlur = 30 * (pumpkinHitFlash/10);
   }
 
-  // ── STEM ──
-  ctx.fillStyle = '#2a1a0a';
-  ctx.fillRect(-3, -26, 6, 8);
-  ctx.fillStyle = '#3a2a1a';
-  ctx.fillRect(-2, -28, 4, 5);
+  const glowR = 60 + Math.sin(t*0.08)*10;
+  const grd = ctx.createRadialGradient(0,0,5,0,0,glowR);
+  // glow shifts red when hurt
+  const glowB = Math.floor(255 * hpRatio);
+  const glowRed = Math.floor(255 * (1-hpRatio) * 0.5);
+  grd.addColorStop(0, `rgba(${glowRed+60},${glowRed},${glowB},0.25)`);
+  grd.addColorStop(1, 'rgba(0,0,80,0)');
+  ctx.fillStyle = grd;
+  ctx.beginPath(); ctx.arc(0,0,glowR,0,Math.PI*2); ctx.fill();
 
-  // ── CARVED FACE ──
-  // Eyes — triangles
-  ctx.fillStyle = '#0022aa';
-  ctx.shadowColor = '#4488ff';
-  ctx.shadowBlur = 8;
-  // left eye
+  ctx.globalAlpha = alpha*0.3;
+  ctx.fillStyle = '#000066';
+  ctx.beginPath(); ctx.ellipse(0,36,22,8,0,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha = alpha;
+
+  // horns
+  ctx.fillStyle = '#111111'; ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+  const hw = Math.sin(pumpkin.hornWobble*0.03)*2;
+  ctx.save(); ctx.translate(-18,-24); ctx.rotate((-15+hw)*Math.PI/180);
+  ctx.beginPath(); ctx.moveTo(-5,18); ctx.lineTo(0,-18); ctx.lineTo(5,18); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-2,-16); ctx.lineTo(0,-26); ctx.lineTo(2,-16); ctx.closePath(); ctx.fillStyle='#222'; ctx.fill();
+  ctx.restore();
+  ctx.save(); ctx.translate(18,-24); ctx.rotate((15-hw)*Math.PI/180);
+  ctx.fillStyle='#111111';
+  ctx.beginPath(); ctx.moveTo(-5,18); ctx.lineTo(0,-18); ctx.lineTo(5,18); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-2,-16); ctx.lineTo(0,-26); ctx.lineTo(2,-16); ctx.closePath(); ctx.fillStyle='#222'; ctx.fill();
+  ctx.restore();
+
+  // pumpkin body — tints toward red/damaged as hp drops
+  const segments = 5;
+  for (let i = 0; i < segments; i++) {
+    const segX = (i-2)*10;
+    const sw = 14 - Math.abs(i-2)*1.5, sh = 26 - Math.abs(i-2)*2;
+    const r1 = Math.floor(255*(1-hpRatio)*0.6);
+    const grdSeg = ctx.createRadialGradient(segX-3,-6,2,segX,0,sw+4);
+    grdSeg.addColorStop(0, `rgb(255,${255-r1},${255-r1*2})`);
+    grdSeg.addColorStop(0.5, `rgb(${221-r1},${232-r1},255)`);
+    grdSeg.addColorStop(1, '#aabbdd');
+    ctx.fillStyle = grdSeg;
+    ctx.strokeStyle = 'rgba(180,200,255,0.4)'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.ellipse(segX,0,sw,sh,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  }
+
+  ctx.fillStyle = '#2a1a0a'; ctx.fillRect(-3,-26,6,8);
+  ctx.fillStyle = '#3a2a1a'; ctx.fillRect(-2,-28,4,5);
+
+  ctx.fillStyle = '#0022aa'; ctx.shadowColor = '#4488ff'; ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.moveTo(-14,-8); ctx.lineTo(-8,-16); ctx.lineTo(-2,-8); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(2,-8); ctx.lineTo(8,-16); ctx.lineTo(14,-8); ctx.closePath(); ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(-14, -8);
-  ctx.lineTo(-8, -16);
-  ctx.lineTo(-2, -8);
-  ctx.closePath();
-  ctx.fill();
-  // right eye
-  ctx.beginPath();
-  ctx.moveTo(2, -8);
-  ctx.lineTo(8, -16);
-  ctx.lineTo(14, -8);
-  ctx.closePath();
-  ctx.fill();
-  // Mouth — jagged
-  ctx.beginPath();
-  ctx.moveTo(-14, 6);
-  ctx.lineTo(-10, 14);
-  ctx.lineTo(-6, 6);
-  ctx.lineTo(-2, 12);
-  ctx.lineTo(2, 6);
-  ctx.lineTo(6, 14);
-  ctx.lineTo(10, 6);
-  ctx.lineTo(14, 6);
-  ctx.lineTo(12, 18);
-  ctx.lineTo(-12, 18);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(-14,6); ctx.lineTo(-10,14); ctx.lineTo(-6,6); ctx.lineTo(-2,12);
+  ctx.lineTo(2,6); ctx.lineTo(6,14); ctx.lineTo(10,6); ctx.lineTo(14,6);
+  ctx.lineTo(12,18); ctx.lineTo(-12,18); ctx.closePath(); ctx.fill();
   ctx.shadowBlur = 0;
 
-  // ── BLUE FLAME (top) ──
-  drawFlame(0, -28, t);
-
+  drawFlame(0,-28,t);
   ctx.restore();
+
+  // HP bar above pumpkin
+  if (!pumpkin.dead) {
+    const barW = 60, barH = 7;
+    const bx = px - barW/2, by = py + bob - 55;
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(bx-1, by-1, barW+2, barH+2);
+    ctx.fillStyle = '#330000';
+    ctx.fillRect(bx, by, barW, barH);
+    const hpColor = hpRatio > 0.5 ? `rgb(${Math.floor(255*(1-hpRatio)*2)},200,80)` : `rgb(220,${Math.floor(hpRatio*400)},20)`;
+    ctx.fillStyle = hpColor;
+    ctx.fillRect(bx, by, barW * hpRatio, barH);
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 0.5;
+    ctx.strokeRect(bx, by, barW, barH);
+
+    // skull icon
+    ctx.font = '10px Georgia'; ctx.fillStyle = '#ffffff';
+    ctx.fillText('💀', bx - 16, by + 7);
+  }
 }
 
 function drawFlame(fx, fy, t) {
-  const flicker = Math.sin(t * 0.15) * 3 + Math.sin(t * 0.23) * 2;
-  const h = 28 + flicker;
-  const w = 12 + Math.sin(t * 0.1) * 2;
-
-  // outer flame
-  const g1 = ctx.createRadialGradient(fx, fy - h*0.4, 1, fx, fy - h*0.3, w);
-  g1.addColorStop(0, 'rgba(200,220,255,0.95)');
-  g1.addColorStop(0.4, 'rgba(80,120,255,0.8)');
-  g1.addColorStop(0.8, 'rgba(20,40,200,0.5)');
-  g1.addColorStop(1, 'rgba(0,0,100,0)');
-  ctx.fillStyle = g1;
-  ctx.shadowColor = '#4488ff';
-  ctx.shadowBlur = 20;
+  const flicker = Math.sin(t*0.15)*3 + Math.sin(t*0.23)*2;
+  const h = 28+flicker, w = 12+Math.sin(t*0.1)*2;
+  const g1 = ctx.createRadialGradient(fx,fy-h*0.4,1,fx,fy-h*0.3,w);
+  g1.addColorStop(0,'rgba(200,220,255,0.95)'); g1.addColorStop(0.4,'rgba(80,120,255,0.8)');
+  g1.addColorStop(0.8,'rgba(20,40,200,0.5)'); g1.addColorStop(1,'rgba(0,0,100,0)');
+  ctx.fillStyle=g1; ctx.shadowColor='#4488ff'; ctx.shadowBlur=20;
   ctx.beginPath();
-  ctx.moveTo(fx - w*0.6, fy);
-  ctx.bezierCurveTo(fx - w, fy - h*0.3, fx - w*0.5, fy - h*0.7, fx + Math.sin(t*0.07)*3, fy - h);
-  ctx.bezierCurveTo(fx + w*0.5, fy - h*0.7, fx + w, fy - h*0.3, fx + w*0.6, fy);
-  ctx.closePath();
-  ctx.fill();
-
-  // inner bright core
-  const g2 = ctx.createRadialGradient(fx, fy - h*0.35, 1, fx, fy - h*0.3, w*0.5);
-  g2.addColorStop(0, 'rgba(255,255,255,0.95)');
-  g2.addColorStop(0.5, 'rgba(180,200,255,0.7)');
-  g2.addColorStop(1, 'rgba(80,120,255,0)');
-  ctx.fillStyle = g2;
+  ctx.moveTo(fx-w*0.6,fy);
+  ctx.bezierCurveTo(fx-w,fy-h*0.3,fx-w*0.5,fy-h*0.7,fx+Math.sin(t*0.07)*3,fy-h);
+  ctx.bezierCurveTo(fx+w*0.5,fy-h*0.7,fx+w,fy-h*0.3,fx+w*0.6,fy);
+  ctx.closePath(); ctx.fill();
+  const g2=ctx.createRadialGradient(fx,fy-h*0.35,1,fx,fy-h*0.3,w*0.5);
+  g2.addColorStop(0,'rgba(255,255,255,0.95)'); g2.addColorStop(0.5,'rgba(180,200,255,0.7)'); g2.addColorStop(1,'rgba(80,120,255,0)');
+  ctx.fillStyle=g2;
   ctx.beginPath();
-  ctx.moveTo(fx - w*0.3, fy);
-  ctx.bezierCurveTo(fx - w*0.5, fy - h*0.4, fx - w*0.2, fy - h*0.75, fx, fy - h*0.85);
-  ctx.bezierCurveTo(fx + w*0.2, fy - h*0.75, fx + w*0.5, fy - h*0.4, fx + w*0.3, fy);
-  ctx.closePath();
-  ctx.fill();
-  ctx.shadowBlur = 0;
+  ctx.moveTo(fx-w*0.3,fy); ctx.bezierCurveTo(fx-w*0.5,fy-h*0.4,fx-w*0.2,fy-h*0.75,fx,fy-h*0.85);
+  ctx.bezierCurveTo(fx+w*0.2,fy-h*0.75,fx+w*0.5,fy-h*0.4,fx+w*0.3,fy); ctx.closePath(); ctx.fill();
+  ctx.shadowBlur=0;
 }
 
-function spawnParticles(x, y) {
+function spawnFlameParticles(x, y) {
   for (let i = 0; i < 3; i++) {
-    particles.push({
-      x, y,
-      vx: (Math.random()-0.5)*1.5,
-      vy: -Math.random()*2 - 0.5,
-      life: 1.0,
-      size: Math.random()*4+2
-    });
+    particles.push({ x, y, vx:(Math.random()-0.5)*1.5, vy:-Math.random()*2-0.5, life:1.0, size:Math.random()*4+2, type:'flame' });
+  }
+}
+
+function spawnHitParticles(x, y, color) {
+  for (let i = 0; i < 10; i++) {
+    const angle = Math.random()*Math.PI*2;
+    const speed = Math.random()*4+1;
+    particles.push({ x, y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed, life:1.0, size:Math.random()*5+2, type:'hit', color });
   }
 }
 
 function drawParticles() {
   for (const p of particles) {
-    ctx.globalAlpha = p.life * 0.7;
-    ctx.fillStyle = `hsl(${210 + Math.random()*40}, 100%, ${70+p.life*30}%)`;
-    ctx.shadowColor = '#4488ff';
-    ctx.shadowBlur = 8;
+    ctx.globalAlpha = p.life * 0.85;
+    if (p.type === 'flame') {
+      ctx.fillStyle = `hsl(${210+Math.random()*40},100%,${70+p.life*30}%)`;
+      ctx.shadowColor = '#4488ff'; ctx.shadowBlur = 8;
+    } else {
+      ctx.fillStyle = p.color || '#ffffff';
+      ctx.shadowColor = p.color || '#ffffff'; ctx.shadowBlur = 6;
+    }
     ctx.beginPath();
-    ctx.arc(p.x - camX, p.y - camY, p.size * p.life, 0, Math.PI*2);
+    ctx.arc(p.x-camX, p.y-camY, p.size*p.life, 0, Math.PI*2);
     ctx.fill();
   }
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+}
+
+// ── Attack arc visual ──────────────────────────────────────────────────
+function drawAttackArc() {
+  if (!player.weapon || attackAnim <= 0) return;
+  const sx = player.x - camX, sy = player.y - camY;
+  const progress = attackAnim / 15;
+  const range = player.weapon.range;
+  const arcAngle = Math.PI * 0.8;
+  const baseAngle = attackAngle - arcAngle * 0.5;
+
+  ctx.save();
+  ctx.globalAlpha = progress * 0.35;
+  ctx.fillStyle = player.weapon.color;
+  ctx.shadowColor = player.weapon.color;
+  ctx.shadowBlur = 20;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.arc(sx, sy, range * progress, baseAngle, baseAngle + arcAngle * (1-progress+0.3));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// ── HUD ────────────────────────────────────────────────────────────────
+function drawHUD(elapsed) {
+  const secs = Math.floor(elapsed/1000), mins = Math.floor(secs/60);
+  const s = (secs%60).toString().padStart(2,'0');
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(8,8,140,30);
+  ctx.fillStyle = '#8899cc'; ctx.font = '14px Georgia';
+  ctx.fillText(`⏱ ${mins}:${s} überlebt`, 16, 28);
+
+  const dist = Math.hypot(pumpkin.x-player.x, pumpkin.y-player.y);
+  const danger = Math.max(0,1-dist/300);
+  ctx.fillStyle = `rgba(${Math.floor(danger*255)},0,${Math.floor((1-danger)*100)},0.7)`;
+  ctx.fillRect(W-148,8,140,30);
+  ctx.fillStyle = '#ccaaff'; ctx.font = '13px Georgia';
+  ctx.fillText(dist<80?'⚠ ER IST NAH!':dist<160?'👁 Er sieht dich...':'🌑 Sicher... vorerst', W-140, 28);
+
+  // weapon slot
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(8, H-50, 180, 42);
+  ctx.strokeStyle = player.weapon ? player.weapon.color : '#333';
+  ctx.lineWidth = 1.5; ctx.strokeRect(8, H-50, 180, 42);
+  if (player.weapon) {
+    ctx.fillStyle = player.weapon.color; ctx.font = '13px Georgia';
+    ctx.fillText(`${player.weapon.icon} ${player.weapon.name}`, 16, H-31);
+    ctx.fillStyle = '#666677'; ctx.font = '11px Georgia';
+    const cdPct = player.attackCooldown > 0 ? player.attackCooldown/player.weapon.cooldown : 0;
+    if (cdPct > 0) {
+      ctx.fillStyle = '#334'; ctx.fillRect(16, H-20, 160, 8);
+      ctx.fillStyle = '#4488ff'; ctx.fillRect(16, H-20, 160*(1-cdPct), 8);
+      ctx.fillStyle = '#88aaff'; ctx.font = '10px Georgia'; ctx.fillText('Aufladen...', 70, H-13);
+    } else {
+      ctx.fillStyle = '#88ff88'; ctx.fillText('LEERTASTE = Angriff', 16, H-13);
+    }
+  } else {
+    ctx.fillStyle = '#556'; ctx.font = '12px Georgia';
+    ctx.fillText('Keine Waffe — finde eine!', 16, H-24);
+    ctx.fillStyle = '#445'; ctx.font = '11px Georgia';
+    ctx.fillText('Laufe über leuchtende Waffen', 16, H-10);
+  }
+
+  // damage numbers floating
+  for (const e of hitEffects) {
+    ctx.globalAlpha = e.life;
+    ctx.fillStyle = '#ff4444'; ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 8;
+    ctx.font = `bold ${14 + Math.floor((1-e.life)*4)}px Georgia`;
+    ctx.fillText(`-${e.dmg}`, e.x-camX, e.y-camY);
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
 }
 
 function drawNightOverlay() {
-  // vignette
-  const grd = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.85);
-  grd.addColorStop(0, 'rgba(0,0,20,0)');
-  grd.addColorStop(1, 'rgba(0,0,10,0.75)');
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, W, H);
+  const grd = ctx.createRadialGradient(W/2,H/2,H*0.3,W/2,H/2,H*0.85);
+  grd.addColorStop(0,'rgba(0,0,20,0)'); grd.addColorStop(1,'rgba(0,0,10,0.75)');
+  ctx.fillStyle = grd; ctx.fillRect(0,0,W,H);
 }
 
-function drawHUD(elapsed) {
-  const secs = Math.floor(elapsed / 1000);
-  const mins = Math.floor(secs / 60);
-  const s = (secs % 60).toString().padStart(2,'0');
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.fillRect(8, 8, 130, 30);
-  ctx.fillStyle = '#8899cc';
-  ctx.font = '14px Georgia';
-  ctx.fillText(`⏱ ${mins}:${s} überlebt`, 16, 28);
-
-  // distance to pumpkin
-  const dist = Math.hypot(pumpkin.x - player.x, pumpkin.y - player.y);
-  const danger = Math.max(0, 1 - dist / 300);
-  ctx.fillStyle = `rgba(${Math.floor(danger*255)}, 0, ${Math.floor((1-danger)*100)}, 0.7)`;
-  ctx.fillRect(W - 138, 8, 130, 30);
-  ctx.fillStyle = '#ccaaff';
-  ctx.font = '13px Georgia';
-  ctx.fillText(dist < 80 ? '⚠ ER IST NAH!' : dist < 160 ? '👁 Er sieht dich...' : '🌑 Sicher... vorerst', W-130, 28);
-}
-
-// ── Main Loop ─────────────────────────────────────────────────────────
+// ── Main Loop ──────────────────────────────────────────────────────────
 let lastT = 0;
 function loop(ts) {
   if (!gameActive) return;
-  const dt = Math.min((ts - lastT) / 16.67, 3);
+  const dt = Math.min((ts-lastT)/16.67, 3);
   lastT = ts;
   flickerT++;
   const elapsed = Date.now() - startTime;
 
-  // ── Player movement ──
+  // player movement
   const spd = 2.8;
   let dx = 0, dy = 0;
-  if (keys['ArrowLeft']  || keys['a'] || keys['A']) dx -= spd;
-  if (keys['ArrowRight'] || keys['d'] || keys['D']) dx += spd;
-  if (keys['ArrowUp']    || keys['w'] || keys['W']) dy -= spd;
-  if (keys['ArrowDown']  || keys['s'] || keys['S']) dy += spd;
-
-  if (dx !== 0 || dy !== 0) {
-    const len = Math.hypot(dx, dy);
-    dx = dx/len * spd; dy = dy/len * spd;
+  if (keys['ArrowLeft'] ||keys['a']||keys['A']) dx -= spd;
+  if (keys['ArrowRight']||keys['d']||keys['D']) dx += spd;
+  if (keys['ArrowUp']   ||keys['w']||keys['W']) dy -= spd;
+  if (keys['ArrowDown'] ||keys['s']||keys['S']) dy += spd;
+  if (dx!==0||dy!==0) {
+    const len = Math.hypot(dx,dy); dx=dx/len*spd; dy=dy/len*spd;
     player.step += 1.5;
-    if (dx !== 0) player.facing = Math.sign(dx);
+    if (dx!==0) player.facing = Math.sign(dx);
+  }
+  const nx=player.x+dx, ny=player.y+dy;
+  const half=8,foot=26;
+  if (!isSolid(nx-half,player.y+foot)&&!isSolid(nx+half,player.y+foot)&&!isSolid(nx-half,player.y+10)&&!isSolid(nx+half,player.y+10)) player.x=nx;
+  if (!isSolid(player.x-half,ny+foot)&&!isSolid(player.x+half,ny+foot)&&!isSolid(player.x-half,ny+10)&&!isSolid(player.x+half,ny+10)) player.y=ny;
+  player.x=Math.max(half,Math.min(MAP_W*TILE-half,player.x));
+  player.y=Math.max(10,Math.min(MAP_H*TILE-6,player.y));
+
+  // weapon pickup
+  for (let i = weaponPickups.length-1; i >= 0; i--) {
+    const w = weaponPickups[i];
+    if (Math.hypot(w.x-player.x, w.y-player.y) < 28) {
+      player.weapon = w.type;
+      player.attackCooldown = 0;
+      weaponPickups.splice(i, 1);
+    }
   }
 
-  // collision
-  const nx = player.x + dx;
-  const ny = player.y + dy;
-  const half = 8, foot = 26;
-  if (!isSolid(nx - half, player.y + foot) && !isSolid(nx + half, player.y + foot) &&
-      !isSolid(nx - half, player.y + 10)   && !isSolid(nx + half, player.y + 10)) {
-    player.x = nx;
+  // attack
+  if (player.attackCooldown > 0) player.attackCooldown--;
+  if ((keys[' '] || keys['Space']) && player.weapon && player.attackCooldown === 0 && !pumpkin.dead) {
+    // trigger attack
+    attackAnim = 15;
+    attackAngle = Math.atan2(pumpkin.y - player.y, pumpkin.x - player.x);
+    player.attackCooldown = player.weapon.cooldown;
+
+    // check if pumpkin is in range
+    const dist = Math.hypot(pumpkin.x-player.x, pumpkin.y-player.y);
+    if (dist <= player.weapon.range + 10) {
+      pumpkin.hp = Math.max(0, pumpkin.hp - player.weapon.damage);
+      pumpkinHitFlash = 10;
+      spawnHitParticles(pumpkin.x, pumpkin.y, player.weapon.color);
+      hitEffects.push({ x: pumpkin.x + (Math.random()-0.5)*20, y: pumpkin.y - 30, dmg: player.weapon.damage, life: 1.0 });
+      // knockback
+      const ddx = pumpkin.x-player.x, ddy = pumpkin.y-player.y;
+      const ddist = Math.hypot(ddx,ddy)||1;
+      pumpkin.vx += (ddx/ddist)*5;
+      pumpkin.vy += (ddy/ddist)*5;
+    }
   }
-  if (!isSolid(player.x - half, ny + foot) && !isSolid(player.x + half, ny + foot) &&
-      !isSolid(player.x - half, ny + 10)   && !isSolid(player.x + half, ny + 10)) {
-    player.y = ny;
-  }
-  player.x = Math.max(half, Math.min(MAP_W*TILE - half, player.x));
-  player.y = Math.max(10,   Math.min(MAP_H*TILE - 6,    player.y));
+  if (attackAnim > 0) attackAnim--;
+  if (pumpkinHitFlash > 0) pumpkinHitFlash--;
 
-  // ── Camera ──
-  const targetCX = player.x - W/2;
-  const targetCY = player.y - H/2;
-  camX += (targetCX - camX) * 0.1;
-  camY += (targetCY - camY) * 0.1;
+  // camera
+  camX += (player.x-W/2-camX)*0.1;
+  camY += (player.y-H/2-camY)*0.1;
 
-  // ── Pumpkin AI ──
-  pumpkin.wobble++;
-  pumpkin.hornWobble++;
-  pumpkin.flameT++;
+  // pumpkin AI
+  pumpkin.wobble++; pumpkin.hornWobble++; pumpkin.flameT++;
+  if (pumpkin.appearing) { pumpkin.alpha=Math.min(1,pumpkin.alpha+0.008); if(pumpkin.alpha>=1)pumpkin.appearing=false; }
 
-  if (pumpkin.appearing) {
-    pumpkin.alpha = Math.min(1, pumpkin.alpha + 0.008);
-    if (pumpkin.alpha >= 1) pumpkin.appearing = false;
-  }
+  if (!pumpkin.dead) {
+    const chaseSpeed = 0.9 + Math.min(3, elapsed/30000)*1.1;
+    const pdx=player.x-pumpkin.x, pdy=player.y-pumpkin.y;
+    const pdist=Math.hypot(pdx,pdy);
+    if (pdist>5) { pumpkin.vx+=(pdx/pdist)*chaseSpeed*0.06; pumpkin.vy+=(pdy/pdist)*chaseSpeed*0.06; }
+    pumpkin.vx*=0.93; pumpkin.vy*=0.93;
+    pumpkin.vx+=(Math.random()-0.5)*0.2; pumpkin.vy+=(Math.random()-0.5)*0.2;
+    pumpkin.x+=pumpkin.vx; pumpkin.y+=pumpkin.vy;
 
-  // chase speed increases over time
-  const chaseSpeed = 0.9 + Math.min(3, elapsed / 30000) * 1.1;
-  const pdx = player.x - pumpkin.x;
-  const pdy = player.y - pumpkin.y;
-  const pdist = Math.hypot(pdx, pdy);
-  if (pdist > 5) {
-    pumpkin.vx += (pdx / pdist) * chaseSpeed * 0.06;
-    pumpkin.vy += (pdy / pdist) * chaseSpeed * 0.06;
-  }
-  // drag
-  pumpkin.vx *= 0.93;
-  pumpkin.vy *= 0.93;
-  // random drift for eeriness
-  pumpkin.vx += (Math.random()-0.5) * 0.2;
-  pumpkin.vy += (Math.random()-0.5) * 0.2;
-  pumpkin.x += pumpkin.vx;
-  pumpkin.y += pumpkin.vy;
+    if (flickerT%3===0) spawnFlameParticles(pumpkin.x,pumpkin.y-38);
 
-  // flame particles
-  if (flickerT % 3 === 0) {
-    spawnParticles(pumpkin.x, pumpkin.y - 38);
+    // catch
+    if (pdist<32) {
+      gameActive=false;
+      const sc=Math.floor(elapsed/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
+      document.getElementById('surviveTime').textContent=`Du hast ${mn}:${ss} Minuten überlebt.`;
+      document.getElementById('gameOver').style.display='flex';
+    }
+    // death
+    if (pumpkin.hp<=0) {
+      pumpkin.dead=true;
+      spawnHitParticles(pumpkin.x,pumpkin.y,'#4488ff');
+      spawnHitParticles(pumpkin.x,pumpkin.y,'#ffffff');
+    }
+  } else {
+    // death animation
+    pumpkin.alpha = Math.max(0, pumpkin.alpha-0.02);
+    spawnHitParticles(pumpkin.x,pumpkin.y,'#4488ff');
+    if (pumpkin.alpha<=0) {
+      gameActive=false;
+      const sc=Math.floor(elapsed/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
+      document.getElementById('winTime').textContent=`Überlebt in ${mn}:${ss} Minuten!`;
+      document.getElementById('winScreen').style.display='flex';
+    }
   }
 
   // update particles
-  for (const p of particles) {
-    p.x += p.vx;
-    p.y += p.vy;
-    p.life -= 0.025;
-  }
-  for (let i = particles.length-1; i >= 0; i--) {
-    if (particles[i].life <= 0) particles.splice(i, 1);
-  }
+  for (const p of particles) { p.x+=p.vx; p.y+=p.vy; p.life-=0.025; }
+  for (let i=particles.length-1;i>=0;i--) if(particles[i].life<=0)particles.splice(i,1);
+  for (const e of hitEffects) { e.y-=1; e.life-=0.04; }
+  for (let i=hitEffects.length-1;i>=0;i--) if(hitEffects[i].life<=0)hitEffects.splice(i,1);
 
-  // ── Catch check ──
-  if (pdist < 32) {
-    gameActive = false;
-    const secs = Math.floor(elapsed / 1000);
-    const mins = Math.floor(secs / 60);
-    const s = (secs % 60).toString().padStart(2,'0');
-    document.getElementById('surviveTime').textContent = `Du hast ${mins}:${s} Minuten überlebt.`;
-    document.getElementById('gameOver').style.display = 'flex';
-  }
-
-  // ── Draw ──
-  ctx.fillStyle = '#080608';
-  ctx.fillRect(0, 0, W, H);
+  // draw
+  ctx.fillStyle='#080608'; ctx.fillRect(0,0,W,H);
   drawWorld();
+  drawWeaponPickups(flickerT);
   drawParticles();
-  drawPlayer(player.x - camX, player.y - camY);
-  drawPumpkin(flickerT);
+  drawAttackArc();
+  drawPlayer(player.x-camX, player.y-camY);
+  if (!pumpkin.dead || pumpkin.alpha>0) drawPumpkin(flickerT);
   drawNightOverlay();
   drawHUD(elapsed);
 
