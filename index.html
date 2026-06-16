@@ -29,10 +29,6 @@
   #gameOver { background:rgba(0,0,0,0.88); }
   #gameOver h1 { font-size: 50px; color: #ff4444; text-shadow: 0 0 30px #ff0000; margin-bottom: 14px; }
   #gameOver p { font-size: 15px; color: #cc9999; margin-bottom: 6px; }
-  #stageWin { background:rgba(0,0,0,0.9); }
-  #stageWin h1 { font-size: 44px; margin-bottom: 10px; }
-  #stageWin .biome-badge { font-size: 54px; margin-bottom: 10px; }
-  #stageWin p { font-size: 15px; margin-bottom: 6px; }
   #winScreen { background:rgba(0,0,0,0.92); }
   #winScreen h1 { font-size: 46px; color: #ffdd44; text-shadow: 0 0 30px #ffaa00; margin-bottom: 14px; }
   #winScreen p { font-size: 15px; color: #ddcc88; margin-bottom: 6px; }
@@ -45,7 +41,7 @@
   <div id="startScreen" class="overlay-screen">
     <h1>☽ Der Kürbis-Geist ☾</h1>
     <p>Du wanderst allein durch das Dorf in der Nacht...</p>
-    <p style="color:#ff8888;font-size:13px">5 Stufen · 100 Wellen · immer stärker!</p>
+    <p style="color:#ff8888;font-size:13px">1000 Wellen · 1000 Biome · Unendlicher Wahnsinn!</p>
     <div style="display:flex;gap:16px;margin-top:12px">
       <div style="text-align:center;color:#aa8833;font-size:20px">🍂</div>
       <div style="text-align:center;color:#aaccff;font-size:20px">❄️</div>
@@ -69,22 +65,14 @@
     <button class="btn btn-red" onclick="startGame()" style="margin-top:18px">NOCHMAL VERSUCHEN</button>
   </div>
 
-  <div id="stageWin" class="overlay-screen">
-    <div class="biome-badge" id="swEmoji"></div>
-    <h1 id="swTitle" style="color:#ffdd44;text-shadow:0 0 20px #ffaa00"></h1>
-    <p id="swSub" style="color:#ccbb88;font-size:16px"></p>
-    <p id="swNext" style="font-size:18px;margin-top:10px"></p>
-    <button class="btn btn-purple" id="swBtn" onclick="nextStage()" style="margin-top:18px">WEITER →</button>
-  </div>
-
   <div id="winScreen" class="overlay-screen">
     <h1>🏆 LEGENDE! 🏆</h1>
-    <p>Du hast alle 5 Stufen und 100 Wellen überlebt!</p>
+    <p>Du hast alle 1000 Wellen und 1000 Biome überlebt!</p>
     <p id="winTime" style="color:#ffcc44;font-size:17px;margin-top:8px"></p>
     <button class="btn btn-green" onclick="startGame()" style="margin-top:18px">NOCHMAL SPIELEN</button>
   </div>
 </div>
-<div id="ui">WASD bewegen · LEERTASTE angreifen · 5 Biome · 100 Wellen!</div>
+<div id="ui">WASD bewegen · LEERTASTE angreifen · 1000 Biome · 1000 Wellen!</div>
 
 <script>
 const canvas = document.getElementById('c');
@@ -93,99 +81,78 @@ const W = 800, H = 550;
 const TILE = 40;
 const COLS = Math.ceil(W/TILE)+2, ROWS = Math.ceil(H/TILE)+2;
 const MAP_W = 50, MAP_H = 38;
-const WAVES_PER_STAGE = 20;
 
-// ── Biome configs ──────────────────────────────────────────────────────
-const BIOMES = [
-  {
-    id:'herbst', name:'Herbst-Dorf', emoji:'🍂',
-    nextText:'Der Winter naht...',
-    bg:'#080608',
-    ground:'#2a2420', groundAlt:'#332c28', groundLine:'#1a1410',
-    house:'#3d2b1f', houseWall:'#5a3d2a', houseWin:'#ffee88', houseWinGlow:'#ffdd44',
-    tree:'#0d2b0d', treeTop:'#0a1f0a', treeHL:'rgba(0,50,0,0.5)',
-    fence:'#4a3828',
-    overlayR:0,overlayG:0,overlayB:10,overlayA:0.75,
-    pumpkinHue: null,
-    ambientParticle: null,
-    introText:'Du wanderst allein durch das Herbst-Dorf...',
-    btnClass:'btn-blue',
-  },
-  {
-    id:'winter', name:'Winterwald', emoji:'❄️',
-    nextText:'Die Toten erwachen...',
-    bg:'#04080e',
-    ground:'#b8ccd8', groundAlt:'#ccdbe8', groundLine:'#99aabb',
-    house:'#506070', houseWall:'#6a8090', houseWin:'#aaccff', houseWinGlow:'#88aaff',
-    tree:'#223344', treeTop:'#334455', treeHL:'rgba(150,180,220,0.3)',
-    fence:'#7a8a9a',
-    overlayR:0,overlayG:8,overlayB:30,overlayA:0.65,
-    pumpkinHue:'#aaddff',
-    ambientParticle:'snow',
-    introText:'Eine eisige Nacht im Winterwald...',
-    btnClass:'btn-blue',
-  },
-  {
-    id:'friedhof', name:'Friedhof', emoji:'💀',
-    nextText:'Die Erde bricht auf...',
-    bg:'#020604',
-    ground:'#131a13', groundAlt:'#1c261c', groundLine:'#0a120a',
-    house:'#1a2a1a', houseWall:'#253525', houseWin:'#44ff88', houseWinGlow:'#22cc55',
-    tree:'#081508', treeTop:'#060e06', treeHL:'rgba(0,80,0,0.4)',
-    fence:'#2a3d2a',
-    overlayR:0,overlayG:20,overlayB:0,overlayA:0.72,
-    pumpkinHue:'#66ff88',
-    ambientParticle:'grave',
-    introText:'Die Toten erwachen auf dem Friedhof...',
-    btnClass:'btn-green',
-  },
-  {
-    id:'vulkan', name:'Vulkan-Asche', emoji:'🌋',
-    nextText:'Die Geisterwelt öffnet sich...',
-    bg:'#0e0200',
-    ground:'#2a0e06', groundAlt:'#3a1808', groundLine:'#1a0804',
-    house:'#3a1206', houseWall:'#5a2010', houseWin:'#ff6600', houseWinGlow:'#ff4400',
-    tree:'#1a0600', treeTop:'#260800', treeHL:'rgba(180,40,0,0.3)',
-    fence:'#5a2010',
-    overlayR:20,overlayG:4,overlayB:0,overlayA:0.65,
-    pumpkinHue:'#ff7722',
-    ambientParticle:'ember',
-    introText:'Die Erde brennt unter deinen Füßen...',
-    btnClass:'btn-red',
-  },
-  {
-    id:'geister', name:'Geisterwelt', emoji:'👻',
-    nextText:'Du hast gewonnen!',
-    bg:'#04000a',
-    ground:'#14082a', groundAlt:'#1c1038', groundLine:'#0c0618',
-    house:'#180828', houseWall:'#281040', houseWin:'#cc44ff', houseWinGlow:'#aa00ff',
-    tree:'#0c0420', treeTop:'#08031a', treeHL:'rgba(120,0,200,0.3)',
-    fence:'#281040',
-    overlayR:18,overlayG:0,overlayB:38,overlayA:0.68,
-    pumpkinHue:'#cc44ff',
-    ambientParticle:'spirit',
-    introText:'Du bist in die Geisterwelt gefallen...',
-    btnClass:'btn-purple',
-  },
-];
+// ── Procedural biome generator ─────────────────────────────────────────
+const BIOME_PREFIXES = ['Neon','Kristall','Schatten','Feuer','Eis','Gift','Blut','Sturm','Nebel','Staub','Asche','Geister','Lava','Frost','Donner'];
+const BIOME_SUFFIXES = ['Dorf','Wald','Reich','Welt','Land','Höhle','Turm','Sumpf','Tal','Ebene'];
+const BIOME_EMOJIS = ['🍂','❄️','💀','🌋','👻','🌿','🔥','🌊','⚡','🌑','🩸','💎','🕸️','🌺','☁️','🦇','🐍','🌙','✨','🗡️','🌪️','🧿'];
+const AMBIENT_CYCLE = ['snow','ember','spirit',null,'rain','dust'];
+
+function hsl(h,s,l){ return `hsl(${Math.round(h)},${s}%,${l}%)`; }
+function hslA(h,s,l,a){ return `hsla(${Math.round(h)},${s}%,${l}%,${a})`; }
+
+// Convert HSL to approximate RGB integers for overlay
+function hslToRgb(h,s,l){
+  s/=100; l/=100;
+  const k=n=>(n+h/30)%12;
+  const a=s*Math.min(l,1-l);
+  const f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
+  return [Math.round(f(0)*255),Math.round(f(8)*255),Math.round(f(4)*255)];
+}
+
+function generateBiome(n) {
+  const hue = (n * 137.5) % 360;
+  const compHue = (hue + 180) % 360;
+  const pumpkinHue = (hue + 60) % 360;
+  const [or,og,ob] = hslToRgb(hue, 60, 8);
+
+  const prefix = BIOME_PREFIXES[n % BIOME_PREFIXES.length];
+  const suffix = BIOME_SUFFIXES[Math.floor(n / BIOME_PREFIXES.length) % BIOME_SUFFIXES.length];
+  const name = prefix + '-' + suffix;
+  const emoji = BIOME_EMOJIS[n % BIOME_EMOJIS.length];
+  const ambientParticle = AMBIENT_CYCLE[n % AMBIENT_CYCLE.length];
+
+  return {
+    name,
+    emoji,
+    hue,
+    bg: hsl(hue, 40, 3),
+    ground: hsl(hue, 20, 12),
+    groundAlt: hsl(hue, 22, 16),
+    groundLine: hsl(hue, 18, 8),
+    house: hsl(hue, 25, 18),
+    houseWall: hsl(hue, 28, 26),
+    houseWin: hsl(compHue, 80, 70),
+    houseWinGlow: hsl(compHue, 90, 55),
+    tree: hsl((hue + 120) % 360, 40, 10),
+    treeTop: hsl((hue + 120) % 360, 45, 7),
+    treeHL: hslA((hue + 100) % 360, 50, 30, 0.4),
+    fence: hsl(hue, 22, 24),
+    overlayR: or,
+    overlayG: og,
+    overlayB: ob,
+    overlayA: 0.68,
+    pumpkinHue: hsl(pumpkinHue, 80, 55),
+    ambientParticle,
+  };
+}
 
 // ── Weapon definitions ─────────────────────────────────────────────────
 const WEAPON_TYPES = [
   { id:'sword',  name:'Schwert',    damage:25, range:55, cooldown:40, color:'#aaddff', icon:'🗡️' },
   { id:'axe',    name:'Axt',        damage:40, range:45, cooldown:65, color:'#ffaa44', icon:'🪓' },
   { id:'staff',  name:'Zauberstab', damage:18, range:90, cooldown:30, color:'#dd88ff', icon:'🪄' },
-  { id:'hammer', name:'Hammer',     damage:55,    range:40,  cooldown:80,  color:'#ff8844', icon:'🔨' },
+  { id:'hammer', name:'Hammer',     damage:55, range:40, cooldown:80, color:'#ff8844', icon:'🔨' },
   { id:'oneshot', name:'HEILIGE SENSE', damage:99999, range:120, cooldown:0, color:'#ffffff', icon:'☠️', oneshot:true },
 ];
 
 let worldMap=[], player, pumpkins=[], keys={}, gameActive=false;
 let startTime, particles=[], camX=0, camY=0, flickerT=0;
 let weaponPickups=[], hitEffects=[], attackAnim=0, attackAngle=0;
-let wave=0, stage=0, killed=0, totalKilled=0, screenFlash=0;
+let wave=0, killed=0, totalKilled=0, screenFlash=0;
 let waveLabel={text:'',timer:0};
-let stageLabel={text:'',timer:0,color:'#ffffff'};
 let ambientParticles=[];
-let biome = BIOMES[0];
+let biome = generateBiome(1);
 
 // ── Map ────────────────────────────────────────────────────────────────
 function buildMap() {
@@ -214,14 +181,14 @@ function makePumpkin(x,y,hp){return{x,y,vx:0,vy:0,wobble:Math.random()*100,appea
 
 function spawnWave(wn) {
   wave=wn;
-  const globalWave=(stage-1)*WAVES_PER_STAGE+wn;
-  const count=Math.min(20,Math.ceil(globalWave*0.8));
-  const hp=100+globalWave*10;
-  waveLabel={text:`${biome.emoji} Welle ${wn}/${WAVES_PER_STAGE} · ${count} Kürbisse`,timer:200};
+  const count = Math.min(30, Math.ceil(wave * 0.5));
+  const hp = 100 + wave * 5;
+  biome = generateBiome(wave);
+  waveLabel={text:`${biome.emoji} Welle ${wave}/1000 · ${count} Kürbisse — ${biome.name}`,timer:200};
   const cx=player.x,cy=player.y;
   for(let i=0;i<count;i++){
-    const angle=(Math.PI*2/count)*i+Math.random()*0.5;
-    const dist=350+Math.random()*150;
+    const angle=(Math.PI*2/count)*i+0.3*(i%3);
+    const dist=350+((i*73)%150);
     pumpkins.push(makePumpkin(cx+Math.cos(angle)*dist,cy+Math.sin(angle)*dist,hp));
   }
 }
@@ -236,6 +203,10 @@ function updateAmbient() {
     ambientParticles.push({x:camX+Math.random()*W,y:camY+H,vx:(Math.random()-0.5)*0.5,vy:-1-Math.random()*1.5,life:1,type:'ember'});
   } else if(type==='spirit'&&Math.random()<0.08){
     ambientParticles.push({x:camX+Math.random()*W,y:camY+Math.random()*H,vx:(Math.random()-0.5)*0.4,vy:-0.3-Math.random()*0.3,life:1,type:'spirit'});
+  } else if(type==='rain'&&Math.random()<0.5){
+    ambientParticles.push({x:camX+Math.random()*W,y:camY,vx:-0.5+Math.random()*0.3,vy:6+Math.random()*4,life:1,type:'rain'});
+  } else if(type==='dust'&&Math.random()<0.12){
+    ambientParticles.push({x:camX+Math.random()*W,y:camY+Math.random()*H,vx:(Math.random()-0.5)*0.6,vy:(Math.random()-0.5)*0.3,life:1,type:'dust'});
   }
   for(const p of ambientParticles){p.x+=p.vx;p.y+=p.vy;p.life-=0.008;}
   for(let i=ambientParticles.length-1;i>=0;i--)if(ambientParticles[i].life<=0)ambientParticles.splice(i,1);
@@ -248,6 +219,8 @@ function drawAmbient() {
     if(p.type==='snow'){ctx.fillStyle='#ddeeff';ctx.beginPath();ctx.arc(sx,sy,2,0,Math.PI*2);ctx.fill();}
     else if(p.type==='ember'){ctx.fillStyle=`hsl(${20+Math.random()*20},100%,${50+p.life*30}%)`;ctx.shadowColor='#ff4400';ctx.shadowBlur=6;ctx.beginPath();ctx.arc(sx,sy,2,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
     else if(p.type==='spirit'){const g=ctx.createRadialGradient(sx,sy,0,sx,sy,8);g.addColorStop(0,'rgba(180,80,255,0.6)');g.addColorStop(1,'rgba(80,0,180,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(sx,sy,8,0,Math.PI*2);ctx.fill();}
+    else if(p.type==='rain'){ctx.strokeStyle='rgba(140,160,210,0.6)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+p.vx*3,sy+p.vy*3);ctx.stroke();}
+    else if(p.type==='dust'){const sz=2+p.life*3;ctx.fillStyle=`rgba(160,120,70,${p.life*0.4})`;ctx.beginPath();ctx.arc(sx,sy,sz,0,Math.PI*2);ctx.fill();}
   }
   ctx.globalAlpha=1;ctx.shadowBlur=0;
 }
@@ -261,32 +234,16 @@ function drawTile(type,sx,sy) {
     ctx.fillRect(sx+2,sy+2,17,17);ctx.fillRect(sx+21,sy+21,17,17);ctx.fillRect(sx+2,sy+22,17,15);ctx.fillRect(sx+21,sy+2,17,17);
     ctx.strokeStyle=b.groundLine;ctx.lineWidth=0.5;
     ctx.strokeRect(sx+2,sy+2,17,17);ctx.strokeRect(sx+21,sy+21,17,17);ctx.strokeRect(sx+2,sy+22,17,15);ctx.strokeRect(sx+21,sy+2,17,17);
-    // winter snow patches
-    if(b.id==='winter'){ctx.fillStyle='rgba(240,248,255,0.5)';ctx.fillRect(sx+4,sy+4,12,10);}
   } else if(type===1){
     ctx.fillStyle=b.house;ctx.fillRect(sx,sy,TILE,TILE);
     ctx.fillStyle=b.houseWall;ctx.fillRect(sx+2,sy+2,TILE-4,TILE-4);
     ctx.fillStyle=b.houseWin;ctx.shadowColor=b.houseWinGlow;ctx.shadowBlur=6;ctx.fillRect(sx+8,sy+10,10,8);ctx.shadowBlur=0;
     ctx.strokeStyle=b.house;ctx.lineWidth=1;ctx.strokeRect(sx+8,sy+10,10,8);
-    // grave stones on friedhof
-    if(b.id==='friedhof'){ctx.fillStyle='#334433';ctx.fillRect(sx+14,sy+24,12,14);ctx.fillRect(sx+12,sy+20,16,6);ctx.fillRect(sx+18,sy+16,4,6);}
-    // lava cracks on vulkan
-    if(b.id==='vulkan'){ctx.strokeStyle='#ff4400';ctx.lineWidth=1;ctx.shadowColor='#ff2200';ctx.shadowBlur=4;ctx.beginPath();ctx.moveTo(sx+5,sy+5);ctx.lineTo(sx+15,sy+20);ctx.lineTo(sx+25,sy+15);ctx.stroke();ctx.shadowBlur=0;}
   } else if(type===2){
     ctx.fillStyle=b.house;ctx.fillRect(sx+17,sy+24,6,16);
-    if(b.id==='winter'){// snow tree
-      ctx.fillStyle='#334455';ctx.beginPath();ctx.arc(sx+20,sy+16,16,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='rgba(200,220,240,0.7)';ctx.beginPath();ctx.arc(sx+20,sy+12,13,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='rgba(230,245,255,0.9)';ctx.beginPath();ctx.arc(sx+20,sy+6,9,0,Math.PI*2);ctx.fill();
-    } else if(b.id==='vulkan'){
-      ctx.fillStyle='#1a0800';ctx.beginPath();ctx.arc(sx+20,sy+16,16,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='#300800';ctx.beginPath();ctx.arc(sx+20,sy+8,12,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='rgba(180,30,0,0.3)';ctx.beginPath();ctx.arc(sx+16,sy+14,6,0,Math.PI*2);ctx.fill();
-    } else {
-      ctx.fillStyle=b.tree;ctx.beginPath();ctx.arc(sx+20,sy+16,16,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle=b.treeTop;ctx.beginPath();ctx.arc(sx+20,sy+8,12,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle=b.treeHL;ctx.beginPath();ctx.arc(sx+16,sy+14,6,0,Math.PI*2);ctx.fill();
-    }
+    ctx.fillStyle=b.tree;ctx.beginPath();ctx.arc(sx+20,sy+16,16,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=b.treeTop;ctx.beginPath();ctx.arc(sx+20,sy+8,12,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=b.treeHL;ctx.beginPath();ctx.arc(sx+16,sy+14,6,0,Math.PI*2);ctx.fill();
   } else if(type===3){
     ctx.fillStyle=b.ground;ctx.fillRect(sx,sy,TILE,TILE);
     ctx.fillStyle=b.fence;
@@ -312,14 +269,11 @@ function drawWeaponShape(type,ox,oy,scale){
   else if(type.id==='staff'){ctx.fillStyle='#6633aa';ctx.fillRect(ox-2,oy-22,4,40);const g=ctx.createRadialGradient(ox,oy-22,1,ox,oy-22,8);g.addColorStop(0,'#ffffff');g.addColorStop(0.5,'#cc88ff');g.addColorStop(1,'rgba(80,0,180,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(ox,oy-22,9,0,Math.PI*2);ctx.fill();}
   else if(type.id==='hammer'){ctx.fillStyle='#663322';ctx.fillRect(ox-2,oy-18,4,36);ctx.fillStyle='#888888';ctx.fillRect(ox-10,oy-18,20,14);ctx.strokeStyle='#aaaaaa';ctx.lineWidth=0.5;ctx.strokeRect(ox-10,oy-18,20,14);}
   else if(type.id==='oneshot'){
-    // staff/pole
     ctx.fillStyle='#888899';ctx.fillRect(ox-2,oy-28,4,52);
-    // blade curve
     ctx.strokeStyle='#ffffff';ctx.lineWidth=3;ctx.shadowColor='#ffffff';ctx.shadowBlur=12;
     ctx.beginPath();ctx.moveTo(ox-2,oy-28);ctx.bezierCurveTo(ox+30,oy-28,ox+30,oy+4,ox-2,oy+4);ctx.stroke();
     ctx.strokeStyle='rgba(200,220,255,0.5)';ctx.lineWidth=6;ctx.stroke();
     ctx.shadowBlur=0;
-    // glow orb
     const g=ctx.createRadialGradient(ox,oy-28,1,ox,oy-28,10);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.5,'rgba(180,200,255,0.7)');g.addColorStop(1,'rgba(100,120,255,0)');
     ctx.fillStyle=g;ctx.beginPath();ctx.arc(ox,oy-28,10,0,Math.PI*2);ctx.fill();
   }
@@ -332,14 +286,12 @@ function drawWeaponPickups(t){
     if(sx<-40||sx>W+40||sy<-40||sy>H+40)continue;
     w.bob+=w.rare?0.03:0.05;const bob=Math.sin(w.bob)*(w.rare?8:4);
     if(w.rare){
-      // dramatic pulsing aura for one-shot
       const pulse=0.5+0.5*Math.sin(t*0.08);
       const auraR=40+pulse*20;
       const ag=ctx.createRadialGradient(sx,sy,4,sx,sy,auraR);
       ag.addColorStop(0,'rgba(255,255,255,0.4)');ag.addColorStop(0.5,'rgba(180,200,255,0.15)');ag.addColorStop(1,'rgba(100,120,255,0)');
       ctx.fillStyle=ag;ctx.beginPath();ctx.arc(sx,sy,auraR,0,Math.PI*2);ctx.fill();
       ctx.shadowColor='#ffffff';ctx.shadowBlur=30*pulse;
-      // rotating sparkles
       for(let i=0;i<6;i++){
         const a=t*0.04+i*(Math.PI/3);const sr=28+pulse*6;
         ctx.fillStyle=`rgba(200,220,255,${0.6*pulse})`;ctx.beginPath();ctx.arc(sx+Math.cos(a)*sr,sy+Math.sin(a)*sr,2,0,Math.PI*2);ctx.fill();
@@ -403,10 +355,9 @@ function drawPumpkin(p,t){
   const hw=Math.sin(p.hornWobble*0.03)*2;
   ctx.save();ctx.translate(-18,-24);ctx.rotate((-15+hw)*Math.PI/180);ctx.beginPath();ctx.moveTo(-5,18);ctx.lineTo(0,-18);ctx.lineTo(5,18);ctx.closePath();ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(-2,-16);ctx.lineTo(0,-26);ctx.lineTo(2,-16);ctx.closePath();ctx.fillStyle='#222';ctx.fill();ctx.restore();
   ctx.save();ctx.translate(18,-24);ctx.rotate((15-hw)*Math.PI/180);ctx.fillStyle='#111';ctx.beginPath();ctx.moveTo(-5,18);ctx.lineTo(0,-18);ctx.lineTo(5,18);ctx.closePath();ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(-2,-16);ctx.lineTo(0,-26);ctx.lineTo(2,-16);ctx.closePath();ctx.fillStyle='#222';ctx.fill();ctx.restore();
-  // body — tinted by biome
-  const tintR=biome.pumpkinHue?parseInt(biome.pumpkinHue.slice(1,3),16):255;
-  const tintG=biome.pumpkinHue?parseInt(biome.pumpkinHue.slice(3,5),16):255;
-  const tintB=biome.pumpkinHue?parseInt(biome.pumpkinHue.slice(5,7),16):255;
+  // body — tinted by biome pumpkinHue (parse HSL to approximate RGB)
+  const ph = biome.hue ? (biome.hue + 60) % 360 : 30;
+  const [tintR,tintG,tintB] = hslToRgb(ph,80,55);
   const dmgR=Math.floor((1-hpRatio)*80);
   for(let i=0;i<5;i++){
     const segX=(i-2)*10,sw=14-Math.abs(i-2)*1.5,sh=26-Math.abs(i-2)*2;
@@ -481,26 +432,25 @@ function drawNightOverlay(){
   ctx.fillStyle=grd;ctx.fillRect(0,0,W,H);
 }
 
-// ── Stage bar ──────────────────────────────────────────────────────────
+// ── Biome bar (wave progress 1–1000) ─────────────────────────────────
 function drawBiomeBar(){
-  // stage pips
-  const pw=120,ph=22,px=(W-pw)/2,py=H-36;
-  ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(px-4,py-4,pw+8,ph+8);
-  const sw=(pw-4)/5;
-  for(let i=0;i<5;i++){
-    const active=i<stage;
-    ctx.fillStyle=active?(i===stage-1?biome.pumpkinHue||'#aaaaff':'#446644'):'#222';
-    ctx.fillRect(px+i*(sw+1),py,sw,ph);
-    ctx.font='14px Georgia';ctx.textAlign='center';
-    ctx.fillText(BIOMES[i].emoji,px+i*(sw+1)+sw/2,py+16);
-  }
+  const barW=200,barH=22,barX=(W-barW)/2,barY=H-36;
+  ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(barX-4,barY-4,barW+8,barH+8);
+  ctx.fillStyle='#111';ctx.fillRect(barX,barY,barW,barH);
+  // progress fill using biome hue
+  const prog=Math.max(0,Math.min(1,(wave-1)/999));
+  const fillColor=biome.pumpkinHue||'#4466ff';
+  ctx.fillStyle=fillColor;ctx.fillRect(barX,barY,barW*prog,barH);
+  ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.strokeRect(barX,barY,barW,barH);
+  ctx.fillStyle='#ccddee';ctx.font='11px Georgia';ctx.textAlign='center';
+  ctx.fillText(`${biome.emoji} Welle ${wave} / 1000`,barX+barW/2,barY+15);
   ctx.textAlign='left';
-  // wave progress bar
+
+  // wave progress bar (left side) — kill counter
   const wpx=8,wpy=H-36,wpw=110,wph=22;
   ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(wpx-2,wpy-2,wpw+4,wph+4);
   ctx.fillStyle='#222';ctx.fillRect(wpx,wpy,wpw,wph);
-  ctx.fillStyle=biome.pumpkinHue||'#4466ff';ctx.fillRect(wpx,wpy,wpw*(wave/WAVES_PER_STAGE),wph);
-  ctx.fillStyle='#aabbcc';ctx.font='11px Georgia';ctx.fillText(`Welle ${wave}/${WAVES_PER_STAGE}`,wpx+4,wpy+15);
+  ctx.fillStyle='#aabbcc';ctx.font='11px Georgia';ctx.fillText(`💀 ${totalKilled+killed} gesamt`,wpx+4,wpy+15);
 }
 
 // ── HUD ────────────────────────────────────────────────────────────────
@@ -516,8 +466,8 @@ function drawHUD(elapsed){
   ctx.fillRect(W-148,8,140,30);ctx.fillStyle='#ccaaff';ctx.font='13px Georgia';
   ctx.fillText(minDist<80?'⚠ SIE SIND NAH!':minDist<160?'👁 Vorsicht!':'🌑 Sicher... vorerst',W-140,28);
 
-  // wave + kill
-  ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(W/2-75,8,150,30);
+  // biome name
+  ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(W/2-90,8,180,30);
   ctx.fillStyle='#ffcc44';ctx.font='14px Georgia';ctx.textAlign='center';
   ctx.fillText(`${biome.emoji} ${biome.name}  💀${killed}`,W/2,28);ctx.textAlign='left';
 
@@ -567,9 +517,9 @@ function drawHUD(elapsed){
   // wave label
   if(waveLabel.timer>0){
     const a=Math.min(1,waveLabel.timer/30);ctx.globalAlpha=a;
-    ctx.fillStyle='rgba(0,0,0,0.75)';ctx.fillRect(W/2-150,H/2-28,300,48);
-    ctx.strokeStyle=biome.pumpkinHue||'#ffcc44';ctx.lineWidth=1.5;ctx.strokeRect(W/2-150,H/2-28,300,48);
-    ctx.fillStyle=biome.pumpkinHue||'#ffcc44';ctx.font='bold 18px Georgia';ctx.textAlign='center';
+    ctx.fillStyle='rgba(0,0,0,0.75)';ctx.fillRect(W/2-180,H/2-28,360,48);
+    ctx.strokeStyle=biome.pumpkinHue||'#ffcc44';ctx.lineWidth=1.5;ctx.strokeRect(W/2-180,H/2-28,360,48);
+    ctx.fillStyle=biome.pumpkinHue||'#ffcc44';ctx.font='bold 16px Georgia';ctx.textAlign='center';
     ctx.fillText(waveLabel.text,W/2,H/2+4);ctx.textAlign='left';ctx.globalAlpha=1;waveLabel.timer--;
   }
 
@@ -580,27 +530,18 @@ function drawHUD(elapsed){
 function startGame(){
   document.getElementById('startScreen').style.display='none';
   document.getElementById('gameOver').style.display='none';
-  document.getElementById('stageWin').style.display='none';
   document.getElementById('winScreen').style.display='none';
-  stage=1; biome=BIOMES[0]; killed=0; totalKilled=0;
-  initStage();
+  killed=0; totalKilled=0;
+  initGame();
 }
 
-function nextStage(){
-  document.getElementById('stageWin').style.display='none';
-  stage++; biome=BIOMES[stage-1];
-  initStage();
-}
-
-function initStage(){
+function initGame(){
   buildMap();spawnWeapons();
   player={x:25*TILE,y:19*TILE,facing:1,step:0,weapon:null,attackCooldown:0};
   pumpkins=[];particles=[];hitEffects=[];ambientParticles=[];
   attackAnim=0;wave=0;killed=0;screenFlash=0;
   keys={};gameActive=true;startTime=Date.now();
   camX=player.x-W/2;camY=player.y-H/2;
-  // show stage intro label
-  waveLabel={text:`${biome.emoji} Stufe ${stage}: ${biome.name}`,timer:260};
   spawnWave(1);
   requestAnimationFrame(loop);
 }
@@ -638,13 +579,12 @@ function loop(ts){
     const nearest=alive.reduce((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)<Math.hypot(b.x-player.x,b.y-player.y)?a:b);
     attackAnim=15;attackAngle=Math.atan2(nearest.y-player.y,nearest.x-player.x);player.attackCooldown=player.weapon.cooldown;
     const isOneShot=player.weapon.id==='oneshot';
-    const hitRange=isOneShot?W*2:player.weapon.range+10; // one-shot hits entire map
+    const hitRange=isOneShot?W*2:player.weapon.range+10;
     for(const p of alive){
       if(Math.hypot(p.x-player.x,p.y-player.y)<=hitRange){
         p.hp=0;p.hitFlash=10;
         spawnHitParticles(p.x,p.y,player.weapon.color);
         if(isOneShot){
-          // explosive death burst
           for(let i=0;i<3;i++)spawnHitParticles(p.x,p.y,'#ffffff');
           hitEffects.push({x:p.x,y:p.y-30,dmg:'☠',life:1.5,big:true});
         } else {
@@ -662,7 +602,7 @@ function loop(ts){
   camX+=(player.x-W/2-camX)*0.1;camY+=(player.y-H/2-camY)*0.1;
 
   // pumpkin AI
-  const chaseSpeed=0.9+Math.min(3,((stage-1)*WAVES_PER_STAGE+wave)/50)*1.2;
+  const chaseSpeed=0.9+Math.min(3,wave/50)*1.2;
   for(const p of pumpkins){
     p.wobble++;p.hornWobble++;p.flameT++;if(p.hitFlash>0)p.hitFlash--;
     if(p.appearing){p.alpha=Math.min(1,p.alpha+0.012);if(p.alpha>=1)p.appearing=false;}
@@ -675,7 +615,7 @@ function loop(ts){
       if(pdist<32){
         gameActive=false;
         const sc=Math.floor(elapsed/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
-        document.getElementById('goStage').textContent=`Stufe ${stage} · Welle ${wave} · ${totalKilled+killed} Kürbisse getötet`;
+        document.getElementById('goStage').textContent=`Welle ${wave} · ${totalKilled+killed} Kürbisse getötet`;
         document.getElementById('goTime').textContent=`Zeit: ${mn}:${ss}`;
         document.getElementById('gameOver').style.display='flex';return;
       }
@@ -684,27 +624,16 @@ function loop(ts){
   }
   for(let i=pumpkins.length-1;i>=0;i--)if(pumpkins[i].dead&&pumpkins[i].alpha<=0)pumpkins.splice(i,1);
 
-  // wave / stage progression
+  // wave progression — seamless, no stage screen
   const remaining=pumpkins.filter(p=>!p.dead);
   if(remaining.length===0&&pumpkins.every(p=>p.alpha<=0)){
     const nextWave=wave+1;
-    if(nextWave>WAVES_PER_STAGE){
-      // stage complete
+    if(nextWave>1000){
+      // full win
       gameActive=false;
-      if(stage>=5){
-        // full win
-        const sc=Math.floor((Date.now()-startTime)/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
-        document.getElementById('winTime').textContent=`${mn}:${ss} · 💀 ${totalKilled+killed} Kürbisse getötet`;
-        document.getElementById('winScreen').style.display='flex';
-      } else {
-        const next=BIOMES[stage];
-        document.getElementById('swEmoji').textContent=biome.emoji;
-        document.getElementById('swTitle').textContent=`${biome.name} gemeistert!`;
-        document.getElementById('swSub').textContent=`${killed} Kürbisse auf dieser Stufe besiegt`;
-        document.getElementById('swNext').innerHTML=`Nächste Stufe: <span style="color:${next.pumpkinHue||'#aaaaff'}">${next.emoji} ${next.name}</span>`;
-        document.getElementById('swNext').style.color=next.pumpkinHue||'#aaaaff';
-        document.getElementById('stageWin').style.display='flex';
-      }
+      const sc=Math.floor((Date.now()-startTime)/1000),mn=Math.floor(sc/60),ss=(sc%60).toString().padStart(2,'0');
+      document.getElementById('winTime').textContent=`${mn}:${ss} · 💀 ${totalKilled+killed} Kürbisse getötet`;
+      document.getElementById('winScreen').style.display='flex';
       return;
     }
     spawnWave(nextWave);
