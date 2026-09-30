@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Tale</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none}
+  body{display:flex;align-items:center;justify-content:center}
+  canvas{width:min(100vw,133.33vh);height:min(75vw,100vh);image-rendering:pixelated;background:#000}
+</style>
+</head>
+<body>
+<canvas id="c" width="640" height="480"></canvas>
+<script>
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+const W = 640, H = 480;
+const FONT = 'bold 22px "Courier New", monospace';
+
+// ---------- Eingabe ----------
+const keys = {};
+let pressed = {};
+addEventListener('keydown', e => {
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  if (!keys[e.key]) pressed[e.key] = true;
+  keys[e.key] = true;
+  audioInit();
+});
+addEventListener('keyup', e => { keys[e.key] = false; });
+const down = k => k.some(x => keys[x]);
+const hit = k => k.some(x => pressed[x]);
+const UP = ['ArrowUp','w','W'], DOWN = ['ArrowDown','s','S'], LEFT = ['ArrowLeft','a','A'], RIGHT = ['ArrowRight','d','D'];
+const OK = ['z','Z','Enter',' '];
+
+// Touch: Finger ziehen = bewegen, Tippen = bestätigen
+let touch = null;
+cv.addEventListener('pointerdown', e => {
+  audioInit();
+  touch = { sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, t: performance.now() };
+});
+cv.addEventListener('pointermove', e => { if (touch) { touch.x = e.clientX; touch.y = e.clientY; } });
+addEventListener('pointerup', () => {
+  if (touch && performance.now() - touch.t < 250 && Math.hypot(touch.x - touch.sx, touch.y - touch.sy) < 15) pressed['Enter'] = true;
+  touch = null;
+});
+function touchDir() {
+  if (!touch) return { x: 0, y: 0 };
+  const dx = touch.x - touch.sx, dy = touch.y - touch.sy;
+  return { x: Math.abs(dx) > 12 ? Math.sign(dx) : 0, y: Math.abs(dy) > 12 ? Math.sign(dy) : 0 };
+}
+function axis() {
+  const t = touchDir();
+  return {
+    x: (down(RIGHT) ? 1 : 0) - (down(LEFT) ? 1 : 0) || t.x,
+    y: (down(DOWN) ? 1 : 0) - (down(UP) ? 1 : 0) || t.y
+  };
+}
+
+// ---------- Sound (winzige Beeps) ----------
+let ac = null;
+function audioInit() { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } }
+function beep(f = 440, d = 0.05, type = 'square', v = 0.03) {
+  if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.value = f; g.gain.value = v;
+  o.connect(g); g.connect(ac.destination);
+  o.start(); g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + d); o.stop(ac.currentTime + d);
+}
+
+// ---------- Zufall mit Seed (für stabilen Wald) ----------
+function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+
+// ---------- Spielzustand ----------
+let state = 'title';
+let T = 0;              // Zeit im aktuellen Zustand
+let lv = 1;
+let kills = 0;
+const maxHP = () => 20 + 8 * (lv - 1);
+const myDmg = () => 50 * lv;
+let hp = maxHP();
+
+const player = { x: 80, y: 260, dir: 1, step: 0, rot: 0, scale: 1 };
+const WORLD_W = 1500;
+const HOLE = { x: 1320, y: 262 };
+let cam = 0;
+
+// Bäume
+const trees = [];
+(function () {
+  const r = rng(7);
+  for (let x = 20; x < WORLD_W; x += 46 + r() * 30) {
+    trees.push({ x, y: 30 + r() * 60, s: 0.9 + r() * 0.5, solid: false });
+    trees.push({ x: x + 20, y: 400 + r() * 70, s: 0.9 + r() * 0.5, solid: false });
+  }
+  for (let i = 0; i < 16; i++) {
+    const x = 260 + r() * 950;
+    const y = 130 + r() * 260;
+    if (Math.abs(y - 262) < 55 && x > 900) continue;
+    trees.push({ x, y, s: 1, solid: true });
+  }
+  trees.sort((a, b) => a.y - b.y);
+})();
+
+// Blume
+const flower = { hp: 50, maxHp: 50, face: 'happy', alpha: 0, x: 320, y: 150, shake: 0, show: false };
+
+// Dialog
+let dlg = null;
+function say(lines, cb) { dlg = { lines, i: 0, c: 0, cb }; setFace(); }
+function lineText() { const l = dlg.lines[dlg.i]; return Array.isArray(l) ? l[0] : l; }
+function setFace() { const l = dlg.lines[dlg.i]; if (Array.isArray(l) && l[1]) flower.face = l[1]; }
+function updateDlg(dt) {
+  const txt = lineText();
+  const prev = Math.floor(dlg.c);
+  dlg.c = Math.min(txt.length, dlg.c + dt * 40);
+  if (Math.floor(dlg.c) > prev && txt[Math.floor(dlg.c) - 1] !== ' ') beep(dlg.lines[dlg.i][1] === 'evil' ? 150 : 300, 0.03);
+  if (hit(OK)) {
+    if (dlg.c < txt.length) dlg.c = txt.length;
+    else if (dlg.i < dlg.lines.length - 1) { dlg.i++; dlg.c = 0; setFace(); }
+    else { const cb = dlg.cb; dlg = null; if (cb) cb(); }
+  }
+}
+function drawTextBox(text, yTop = 340) {
+  ctx.fillStyle = '#000'; ctx.fillRect(30, yTop, W - 60, 120);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.strokeRect(32, yTop + 2, W - 64, 116);
+  ctx.fillStyle = '#fff'; ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  wrap(text, 52, yTop + 18, W - 110, 30);
+}
+function wrap(text, x, y, maxW, lh) {
+  let line = '';
+  for (const w of text.split(' ')) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, x, y); y += lh; line = w; }
+    else line = test;
+  }
+  ctx.fillText(line, x, y);
+}
+
+function go(s) { state = s; T = 0; }
+
+// ---------- Zeichnen: Figuren ----------
+function drawPlayer(x, y, rot = 0, sc = 1, walk = 0) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(rot); ctx.scale(sc, sc);
+  const b = Math.sin(walk) * 3;
+  ctx.fillStyle = '#3a4a9a'; // Beine
+  ctx.fillRect(-7, 10, 6, 12 + b); ctx.fillRect(1, 10, 6, 12 - b);
+  ctx.fillStyle = '#b06ad0'; ctx.fillRect(-10, -6, 20, 18);          // Pullover
+  ctx.fillStyle = '#7a3f9a'; ctx.fillRect(-10, 2, 20, 3);
+  ctx.fillStyle = '#f2c9a0'; ctx.fillRect(-11, -26, 22, 22);         // Kopf
+  ctx.fillStyle = '#5a3a20'; ctx.fillRect(-12, -28, 24, 9);          // Haare
+  ctx.fillStyle = '#000'; ctx.fillRect(-6, -14, 3, 3); ctx.fillRect(3, -14, 3, 3);
+  ctx.restore();
+}
+function drawHeart(x, y, s = 1, col = '#f00') {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(0, 8);
+  ctx.bezierCurveTo(-14, -2, -8, -12, 0, -5);
+  ctx.bezierCurveTo(8, -12, 14, -2, 0, 8);
+  ctx.fill(); ctx.restore();
+}
+function drawFlower(x, y, face, alpha = 1, shake = 0, s = 1) {
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.translate(x + (Math.random() - 0.5) * shake, y + (Math.random() - 0.5) * shake); ctx.scale(s, s);
+  // Stiel
+  ctx.fillStyle = '#2b8a2b'; ctx.fillRect(-4, 20, 8, 80);
+  ctx.beginPath(); ctx.ellipse(-16, 70, 16, 7, -0.5, 0, 7); ctx.ellipse(16, 60, 16, 7, 0.5, 0, 7); ctx.fill();
+  // Blütenblätter
+  ctx.fillStyle = face === 'evil' ? '#fff' : '#fff';
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4;
+    ctx.beginPath(); ctx.ellipse(Math.cos(a) * 30, Math.sin(a) * 30, 15, 11, a, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = '#ffd400'; ctx.beginPath(); ctx.arc(0, 0, 24, 0, 7); ctx.fill();
+  ctx.fillStyle = '#000';
+  if (face === 'evil') {
+    ctx.beginPath(); ctx.ellipse(-9, -4, 4, 6, 0, 0, 7); ctx.ellipse(9, -4, 4, 6, 0, 0, 7); ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+    ctx.beginPath(); ctx.moveTo(-17, -16); ctx.lineTo(-4, -9); ctx.moveTo(17, -16); ctx.lineTo(4, -9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-14, 8); ctx.quadraticCurveTo(0, 22, 14, 8); ctx.quadraticCurveTo(0, 14, -14, 8); ctx.fill();
+    ctx.fillStyle = '#fff';
+    for (let i = -10; i <= 10; i += 5) ctx.fillRect(i - 1, 9 + (1 - Math.abs(i) / 10) * 3, 2, 3);
+  } else if (face === 'sad') {
+    ctx.beginPath(); ctx.arc(-9, -3, 3.5, 0, 7); ctx.arc(9, -3, 3.5, 0, 7); ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = '#000';
+    ctx.beginPath(); ctx.moveTo(-8, 14); ctx.quadraticCurveTo(0, 6, 8, 14); ctx.stroke();
+    ctx.fillStyle = '#4af'; ctx.fillRect(-10, 2, 3, 8);
+  } else {
+    ctx.beginPath(); ctx.arc(-9, -4, 3.5, 0, 7); ctx.arc(9, -4, 3.5, 0, 7); ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = '#000';
+    ctx.beginPath(); ctx.arc(0, 4, 11, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawTree(t) {
+  const s = t.s;
+  ctx.fillStyle = '#4a2f18'; ctx.fillRect(t.x - 7 * s - cam, t.y - 4, 14 * s, 44 * s);
+  ctx.fillStyle = '#1f6b2a';
+  ctx.beginPath(); ctx.arc(t.x - cam, t.y - 14 * s, 30 * s, 0, 7); ctx.fill();
+  ctx.fillStyle = '#2a8a38';
+  ctx.beginPath(); ctx.arc(t.x - 8 * s - cam, t.y - 22 * s, 18 * s, 0, 7); ctx.fill();
+}
+
+// ---------- Wald ----------
+function startForest() {
+  player.x = 80; player.y = 260; player.rot = 0; player.scale = 1;
+  lv = 1; kills = 0; hp = maxHP(); flower.maxHp = 50; flower.hp = 50;
+  go('forest');
+}
+let hintT = 0;
+function updateForest(dt) {
+  const a = axis();
+  const len = Math.hypot(a.x, a.y) || 1;
+  const sp = 120;
+  const nx = player.x + a.x / len * sp * dt, ny = player.y + a.y / len * sp * dt;
+  if (a.x || a.y) { player.step += dt * 12; if (a.x) player.dir = a.x; }
+  player.x = Math.max(14, Math.min(WORLD_W - 14, nx));
+  player.y = Math.max(100, Math.min(420, ny));
+  // Baumstämme sind fest
+  for (const t of trees) if (t.solid) {
+    const dx = player.x - t.x, dy = player.y - (t.y + 30);
+    const d = Math.hypot(dx, dy);
+    if (d < 26) { player.x = t.x + dx / (d || 1) * 26; player.y = t.y + 30 + dy / (d || 1) * 26; }
+  }
+  cam = Math.max(0, Math.min(WORLD_W - W, player.x - W / 2));
+  hintT += dt;
+  if (Math.hypot(player.x - (HOLE.x - 40), player.y - HOLE.y) < 20) {
+    beep(200, 0.15, 'sawtooth');
+    go('trip');
+  }
+}
+function drawForest() {
+  ctx.fillStyle = '#123d1c'; ctx.fillRect(0, 0, W, H);
+  // Boden
+  ctx.fillStyle = '#1c5a28'; ctx.fillRect(0, 90, W, 350);
+  ctx.fillStyle = '#226b30';
+  const r = rng(3);
+  for (let i = 0; i < 160; i++) { const x = r() * WORLD_W - cam, y = 100 + r() * 330; if (x > -10 && x < W) ctx.fillRect(x, y, 6, 3); }
+  // Pfad
+  ctx.fillStyle = '#6b5030'; ctx.fillRect(-cam, 235, WORLD_W, 55);
+  // Loch (sieht wie ein dunkler Fleck aus)
+  const ready = state === 'trip' || state === 'fall';
+  ctx.fillStyle = '#2b1d10'; ctx.beginPath(); ctx.ellipse(HOLE.x - cam, HOLE.y, 34, 18, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(HOLE.x - cam, HOLE.y, 26, 12, 0, 0, 7); ctx.fill();
+  // Wurzel
+  ctx.strokeStyle = '#4a2f18'; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(HOLE.x - 70 - cam, HOLE.y + 6); ctx.quadraticCurveTo(HOLE.x - 55 - cam, HOLE.y - 12, HOLE.x - 38 - cam, HOLE.y + 4); ctx.stroke();
+  // Bäume und Spieler nach y sortiert
+  const list = trees.map(t => ({ y: t.solid ? t.y + 30 : t.y + 30, f: () => drawTree(t) }));
+  list.push({ y: player.y + 22, f: () => drawPlayer(player.x - cam, player.y, player.rot, player.scale, player.step) });
+  list.sort((a, b) => a.y - b.y).forEach(o => o.f());
+  // Dunkle Ränder
+  const g = ctx.createRadialGradient(W / 2, H / 2, 150, W / 2, H / 2, 420);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.6)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (state === 'forest' && hintT < 8) {
+    ctx.fillStyle = '#fff'; ctx.font = '18px "Courier New", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText('Laufe durch den Wald  (Pfeiltasten / WASD)', W / 2, 14);
+  }
+}
+
+// ---------- Stolpern & Fallen ----------
+function updateTrip(dt) {
+  player.rot = Math.min(1.2, T * 3);
+  if (T > 0.5 && T < 0.6) beep(120, 0.2, 'sawtooth');
+  if (T > 0.9) {
+    player.x += (HOLE.x - player.x) * dt * 5;
+    player.y += (HOLE.y - player.y) * dt * 5;
+    player.scale = Math.max(0.1, player.scale - dt * 1.3);
+  }
+  cam = Math.max(0, Math.min(WORLD_W - W, player.x - W / 2));
+  if (T > 2) go('fall');
+}
+function drawTrip() {
+  drawForest();
+  if (T < 1) {
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 26px "Courier New", monospace'; ctx.textAlign = 'center';
+    ctx.fillText('Huch!', player.x - cam, player.y - 70);
+  }
+}
+function drawFall() {
+  ctx.fillStyle = '#1a0f08'; ctx.fillRect(0, 0, W, H);
+  const r = rng(11);
+  for (let i = 0; i < 40; i++) {
+    const x = r() * W, sp = 200 + r() * 300, h = 20 + r() * 60;
+    const y = ((r() * H * 2 - T * sp) % (H + 100) + H + 100) % (H + 100) - 50;
+    ctx.fillStyle = i % 3 ? '#3a2412' : '#5a3a1e';
+    ctx.fillRect(x, y, 6, h);
+  }
+  // Lichtpunkt oben wird kleiner
+  const lr = Math.max(0, 60 - T * 14);
+  const g = ctx.createRadialGradient(W / 2, -20, 0, W / 2, -20, lr + 1);
+  g.addColorStop(0, 'rgba(255,255,220,0.9)'); g.addColorStop(1, 'rgba(255,255,220,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, 150);
+  drawPlayer(W / 2 + Math.sin(T * 3) * 40, 220 + Math.sin(T * 2) * 15, Math.sin(T * 4) * 0.8, 1, T * 20);
+  if (T > 3.6) { ctx.fillStyle = `rgba(0,0,0,${Math.min(1, (T - 3.6) * 2.5)})`; ctx.fillRect(0, 0, W, H); }
+}
+function updateFall(dt) {
+  if (T > 3.8) { startWake(); }
+}
+
+// ---------- Aufwachen auf den Blumen ----------
+let wakeStage = 0;
+function startWake() {
+  go('wake'); wakeStage = 0; flower.show = false; flower.alpha = 0; flower.face = 'happy';
+}
+function updateWake(dt) {
+  if (dlg) { updateDlg(dt); return; }
+  if (wakeStage === 0 && T > 1.6) {
+    wakeStage = 1;
+    say(['* ...', '* Du öffnest die Augen. Unter dir liegen goldgelbe Blumen.', '* Sie haben deinen Sturz abgefedert. Du hast überlebt!'], () => { wakeStage = 2; T = 0; });
+  } else if (wakeStage === 2) {
+    if (T > 1) { wakeStage = 3; T = 0; flower.show = true; beep(600, 0.1); }
+  } else if (wakeStage === 3) {
+    flower.alpha = Math.min(1, T * 2);
+    if (T > 1) {
+      wakeStage = 4;
+      say([['Hallo! Ich bin die Blume. Du bist wohl neu hier...', 'happy'],
+           ['In dieser Welt gilt: TÖTEN oder GETÖTET WERDEN.', 'happy'],
+           ['...', 'happy'],
+           ['Bereit zu STERBEN?!', 'evil']], startBattle);
+    }
+  }
+}
+function drawWake() {
+  ctx.fillStyle = '#7ec8e8'; ctx.fillRect(0, 0, W, 130);
+  ctx.fillStyle = '#3a8a3a'; ctx.fillRect(0, 130, W, H - 130);
+  // Blumenfeld
+  const r = rng(5);
+  for (let i = 0; i < 140; i++) {
+    const x = r() * W, y = 150 + r() * 330, s = 0.6 + (y - 150) / 330;
+    ctx.fillStyle = '#2a7a2a'; ctx.fillRect(x - 1, y, 2, 12 * s);
+    ctx.fillStyle = '#ffd400';
+    for (let k = 0; k < 5; k++) { const a = k * 1.256; ctx.beginPath(); ctx.arc(x + Math.cos(a) * 5 * s, y + Math.sin(a) * 5 * s, 3.5 * s, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#e08a00'; ctx.beginPath(); ctx.arc(x, y, 3 * s, 0, 7); ctx.fill();
+  }
+  // Lichtstrahl vom Loch
+  ctx.fillStyle = 'rgba(255,255,200,0.12)'; ctx.beginPath(); ctx.moveTo(280, 0); ctx.lineTo(360, 0); ctx.lineTo(420, 300); ctx.lineTo(220, 300); ctx.fill();
+  const lying = wakeStage < 2;
+  const stand = wakeStage >= 2 ? Math.min(1, T * 1.5) : 0;
+  if (lying) drawPlayer(300, 290, Math.PI / 2, 1, 0);
+  else drawPlayer(300, 290 - 10 * stand, (1 - stand) * Math.PI / 2, 1, 0);
+  if (flower.show) drawFlower(440, 210, flower.face, flower.alpha, flower.face === 'evil' ? 2 : 0, 1.3);
+  if (dlg) {
+    drawTextBox(lineText().slice(0, Math.floor(dlg.c)));
+  }
+}
+
+// ---------- Kampf ----------
+const box = { x: 220, y: 290, w: 200, h: 130 };
+const heart = { x: 320, y: 355 };
+let bullets = [];
+let battleT = 0, spawnA = 0, spawnB = 0, spawnC = 0, inv = 0;
+const BATTLE_TIME = 30;
+let menuSel = 0, menuText = '', barPos = 0, barDir = 1, hitInfo = null, sparing = false;
+
+function startBattle() {
+  flower.show = true; flower.alpha = 1; flower.face = 'evil'; flower.x = 320; flower.y = 130;
+  beginRound(1.2);
+}
+function beginRound(delay = 0.8) {
+  bullets = []; battleT = -delay; spawnA = spawnB = spawnC = 0; inv = 0;
+  heart.x = box.x + box.w / 2; heart.y = box.y + box.h / 2;
+  flower.face = 'evil';
+  go('battle');
+}
+function seed(x, y, vx, vy) { bullets.push({ x, y, vx, vy, r: 5 }); }
+function aimed(speed) {
+  const dx = heart.x - flower.x, dy = heart.y - (flower.y + 20), d = Math.hypot(dx, dy) || 1;
+  seed(flower.x, flower.y + 20, dx / d * speed, dy / d * speed);
+}
+function updateBattle(dt) {
+  battleT += dt;
+  const a = axis(), len = Math.hypot(a.x, a.y) || 1;
+  const sp = down(['Shift']) ? 70 : 140;
+  heart.x = Math.max(box.x + 10, Math.min(box.x + box.w - 10, heart.x + a.x / len * sp * dt));
+  heart.y = Math.max(box.y + 10, Math.min(box.y + box.h - 10, heart.y + a.y / len * sp * dt));
+  if (battleT > 0) {
+    const k = 1 + 0.06 * (lv - 1);
+    const t = battleT;
+    spawnA -= dt; spawnB -= dt; spawnC -= dt;
+    flower.shake = 0;
+    if (t < 10) {                      // Samen zielen auf dich
+      if (spawnA <= 0) { aimed(120 * k); spawnA = 0.75 / k; flower.shake = 3; }
+    } else if (t < 20) {               // Samenregen
+      if (spawnB <= 0) { seed(box.x + 8 + Math.random() * (box.w - 16), box.y - 30, 0, 130 * k); spawnB = 0.22 / k; }
+      if (spawnA <= 0) { aimed(110 * k); spawnA = 1.3; }
+    } else {                           // Samenring + gezielte Samen
+      if (spawnC <= 0) {
+        const off = Math.random() * 6.28;
+        for (let i = 0; i < 10; i++) { const an = off + i * 0.628; seed(flower.x, flower.y + 20, Math.cos(an) * 95 * k, Math.sin(an) * 95 * k + 30); }
+        spawnC = 1.4 / k; flower.shake = 4;
+      }
+      if (spawnA <= 0) { aimed(140 * k); spawnA = 0.9 / k; }
+    }
+  }
+  inv = Math.max(0, inv - dt);
+  for (const b of bullets) {
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    if (inv <= 0 && battleT > 0 && Math.hypot(b.x - heart.x, b.y - heart.y) < b.r + 5) {
+      hp -= 4; inv = 1; b.dead = true; beep(120, 0.15, 'sawtooth', 0.05);
+      if (hp <= 0) { hp = 0; go('gameover'); return; }
+    }
+    if (b.x < -20 || b.x > W + 20 || b.y < -40 || b.y > H + 20) b.dead = true;
+  }
+  bullets = bullets.filter(b => !b.dead);
+  if (battleT >= BATTLE_TIME) {
+    bullets = []; menuSel = 0; sparing = false; flower.face = 'happy';
+    menuText = '* Die Blume ist erschöpft. Was tust du?'; go('menu');
+  }
+}
+function drawHUD() {
+  ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillStyle = '#fff';
+  ctx.fillText('LV ' + lv, 30, 440);
+  ctx.fillText('HP', 200, 440);
+  ctx.fillStyle = '#c00'; ctx.fillRect(240, 440, maxHP() * 3, 22);
+  ctx.fillStyle = '#ff0'; ctx.fillRect(240, 440, hp * 3, 22);
+  ctx.fillStyle = '#fff'; ctx.fillText(hp + ' / ' + maxHP(), 250 + maxHP() * 3, 440);
+}
+function drawBox(b) {
+  ctx.fillStyle = '#000'; ctx.fillRect(b.x, b.y, b.w, b.h);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.strokeRect(b.x, b.y, b.w, b.h);
+}
+function drawBattle() {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  drawFlower(flower.x, flower.y, flower.face, flower.alpha, flower.shake, 1.2);
+  // Timer-Balken
+  if (state === 'battle') {
+    const p = Math.max(0, Math.min(1, battleT / BATTLE_TIME));
+    ctx.fillStyle = '#333'; ctx.fillRect(220, 262, 200, 6);
+    ctx.fillStyle = '#0af'; ctx.fillRect(220, 262, 200 * p, 6);
+  }
+  drawBox(box);
+  ctx.fillStyle = '#fff';
+  for (const b of bullets) { ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r, b.r * 1.4, Math.atan2(b.vy, b.vx) + Math.PI / 2, 0, 7); ctx.fill(); }
+  if (state === 'battle' && !(inv > 0 && Math.floor(inv * 12) % 2)) drawHeart(heart.x, heart.y, 1);
+  drawHUD();
+}
+
+// ---------- Menü: FIGHT / SPARE ----------
+const bigBox = { x: 30, y: 300, w: 580, h: 120 };
+function updateMenu(dt) {
+  if (dlg) { updateDlg(dt); return; }
+  if (hit(LEFT)) { menuSel = 0; beep(500, 0.04); }
+  if (hit(RIGHT)) { menuSel = 1; beep(500, 0.04); }
+  if (hit(OK)) {
+    beep(700, 0.08);
+    if (menuSel === 0) { barPos = 0; barDir = 1; go('bar'); }
+    else doSpare();
+  }
+}
+function drawMenu() {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  if (flower.alpha > 0) drawFlower(flower.x, flower.y, flower.face, flower.alpha, flower.shake, 1.2);
+  // Blumen-HP
+  if (state === 'menu' || state === 'bar' || state === 'hitanim') {
+    ctx.fillStyle = '#600'; ctx.fillRect(250, 260, 140, 10);
+    ctx.fillStyle = '#0c0'; ctx.fillRect(250, 260, 140 * Math.max(0, flower.hp) / flower.maxHp, 10);
+    ctx.fillStyle = '#fff'; ctx.font = '14px "Courier New", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText('Blume  ' + Math.max(0, flower.hp) + '/' + flower.maxHp + ' HP', 320, 275);
+  }
+  drawBox(bigBox);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  if (dlg) { ctx.fillStyle = '#fff'; ctx.font = FONT; wrap(lineText().slice(0, Math.floor(dlg.c)), 52, 320, 520, 30); }
+  else if (state === 'menu') { ctx.fillStyle = '#fff'; ctx.font = FONT; wrap(menuText, 52, 320, 520, 30); }
+  drawHUD();
+  if (state === 'menu' && !dlg) {
+    const bx = [60, 380], labels = ['FIGHT', 'SPARE'];
+    for (let i = 0; i < 2; i++) {
+      const sel = menuSel === i;
+      ctx.strokeStyle = sel ? '#ff0' : '#f80'; ctx.lineWidth = 4; ctx.strokeRect(bx[i], 388, 180, 42);
+      ctx.fillStyle = sel ? '#ff0' : '#f80'; ctx.font = FONT; ctx.textAlign = 'center';
+      ctx.fillText(labels[i], bx[i] + 100, 397);
+      if (sel) drawHeart(bx[i] + 20, 409, 0.8);
+    }
+  }
+  ctx.textAlign = 'left';
+}
+
+// ---------- FIGHT ----------
+let dmgShown = 0;
+function updateBar(dt) {
+  barPos += barDir * dt * 380 * (1 + 0.05 * (lv - 1));
+  if (barPos > 500) { barPos = 500; barDir = -1; }
+  if (barPos < 0) { barPos = 0; barDir = 1; }
+  if (hit(OK)) {
+    const acc = Math.max(0, 1 - Math.abs(barPos - 250) / 250);
+    const mult = acc > 0.92 ? 1 : 0.4 + 0.6 * acc;
+    dmgShown = Math.round(myDmg() * mult);
+    beep(900, 0.15, 'sawtooth', 0.05);
+    go('hitanim');
+  }
+}
+function drawBar() {
+  drawMenu();
+  ctx.fillStyle = '#000'; ctx.fillRect(bigBox.x + 6, bigBox.y + 6, bigBox.w - 12, bigBox.h - 12);
+  const x0 = 70;
+  const g = ctx.createLinearGradient(x0, 0, x0 + 500, 0);
+  g.addColorStop(0, '#400'); g.addColorStop(0.5, '#0f0'); g.addColorStop(1, '#400');
+  ctx.fillStyle = g; ctx.fillRect(x0, 335, 500, 50);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeRect(x0, 335, 500, 50);
+  ctx.fillStyle = '#fff'; ctx.fillRect(x0 + barPos - 4, 325, 8, 70);
+  ctx.font = '16px "Courier New", monospace'; ctx.textAlign = 'center'; ctx.fillText('Z / Enter / Tippen: Treffen!', 320, 400);
+  ctx.textAlign = 'left';
+}
+function updateHitAnim(dt) {
+  if (T < 0.15) return;
+  if (T > 0.15 && !hitInfo) { hitInfo = { d: dmgShown }; flower.hp -= dmgShown; flower.shake = 8; }
+  if (T > 1.4) {
+    hitInfo = null; flower.shake = 0;
+    if (flower.hp <= 0) go('kill');
+    else { flower.face = 'evil'; beginRound(1); }
+  }
+}
+function drawHitAnim() {
+  drawMenu();
+  ctx.fillStyle = '#000'; ctx.fillRect(bigBox.x + 6, bigBox.y + 6, bigBox.w - 12, bigBox.h - 12);
+  // Schlag-Effekt
+  if (T < 0.5) {
+    ctx.strokeStyle = '#f33'; ctx.lineWidth = 5;
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(280 + i * 25, 100 + T * 30); ctx.lineTo(320 + i * 25 - 20, 190 - T * 30); ctx.stroke(); }
+  }
+  if (hitInfo) {
+    ctx.fillStyle = '#f33'; ctx.font = 'bold 40px "Courier New", monospace'; ctx.textAlign = 'center';
+    ctx.fillText('-' + hitInfo.d, 320, 60 - Math.min(20, (T - 0.15) * 40));
+    ctx.textAlign = 'left';
+  }
+  if (hitInfo) flower.shake = Math.max(0, flower.shake - 0.3);
+}
+
+// ---------- Tod der Blume (+ Level) ----------
+function updateKill(dt) {
+  if (dlg) { updateDlg(dt); return; }
+  flower.alpha = Math.max(0, 1 - T * 0.8);
+  if (flower.alpha <= 0 && !killTalk) {
+    killTalk = true;
+    lv++; kills++; hp = maxHP();
+    say(['* Die Blume verschwindet...',
+         '* Du hast LV ' + lv + ' erreicht!',
+         `* HP ist jetzt ${maxHP()}. Dein Schaden ist jetzt ${myDmg()}.`,
+         '* Aus dem Boden wächst eine neue, stärkere Blume...'], () => {
+      killTalk = false;
+      flower.maxHp = 50 + 75 * (lv - 1); flower.hp = flower.maxHp;
+      flower.alpha = 1; flower.face = 'evil';
+      beginRound(1.2);
+    });
+  }
+}
+let killTalk = false;
+function drawKill() { drawMenu(); }
+
+// ---------- SPARE ----------
+function doSpare() {
+  sparing = true; flower.face = 'sad';
+  say([['Du... verschonst mich?', 'sad'], ['Niemand war je nett zu mir...', 'sad'], ['Danke. Ich werde nie wieder jemanden angreifen.', 'sad']], () => go('spare'));
+  go('sparetalk');
+}
+function updateSpare(dt) {
+  if (state === 'sparetalk') { if (dlg) updateDlg(dt); return; }
+  flower.alpha = Math.max(0, 1 - T * 0.6);
+  if (T > 2.5 && hit(OK)) startEnding();
+  if (T > 6) startEnding();
+}
+function drawSpare() {
+  drawMenu();
+  if (T > 1) {
+    ctx.fillStyle = '#ff0'; ctx.font = FONT; ctx.textAlign = 'center';
+    ctx.fillText('* Die Blume geht fort. Du hast sie gerettet.', 320, 320);
+    ctx.textAlign = 'left';
+  }
+}
+function drawSpareTalk() { drawMenu(); }
+function startEnding() { go('end'); }
+function drawEnd() {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillStyle = '#ff0'; ctx.font = 'bold 48px "Courier New", monospace';
+  ctx.fillText('ENDE', 320, 130);
+  ctx.fillStyle = '#fff'; ctx.font = FONT;
+  ctx.fillText('Du hast die Blume gerettet.', 320, 210);
+  ctx.fillText('Erreichtes LV: ' + lv + '   Getötet: ' + kills, 320, 250);
+  drawHeart(320, 320, 2, '#f00');
+  if (Math.floor(T * 2) % 2) { ctx.font = '18px "Courier New", monospace'; ctx.fillText('Z / Enter: Nochmal spielen', 320, 400); }
+  ctx.textAlign = 'left';
+}
+
+// ---------- Game Over ----------
+function updateGameOver(dt) {
+  if (T > 1.5 && hit(OK)) { hp = maxHP(); beginRound(1.2); }
+}
+function drawGameOver() {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  if (T < 1) drawHeart(heart.x, heart.y, 1, '#f00');
+  else {
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 48px "Courier New", monospace'; ctx.fillText('GAME OVER', 320, 150);
+    ctx.font = FONT; ctx.fillText('Bleib entschlossen...', 320, 230);
+    if (T > 1.5) { ctx.font = '18px "Courier New", monospace'; ctx.fillText('Z / Enter: Nochmal versuchen', 320, 300); }
+  }
+  ctx.textAlign = 'left';
+}
+
+// ---------- Titel ----------
+function drawTitle() {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillStyle = '#ffd400'; ctx.font = 'bold 90px "Courier New", monospace';
+  ctx.fillText('TALE', 320, 70);
+  drawFlower(320, 260, 'happy', 1, 0, 0.9);
+  ctx.fillStyle = '#fff'; ctx.font = '16px "Courier New", monospace';
+  ctx.fillText('Bewegen: Pfeiltasten / WASD   •   Bestätigen: Z / Enter   •   Langsam: Shift', 320, 400);
+  if (Math.floor(T * 2) % 2) { ctx.font = FONT; ctx.fillText('Drücke Z oder Enter', 320, 435); }
+  ctx.textAlign = 'left';
+}
+
+// ---------- Hauptschleife ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  T += dt;
+  switch (state) {
+    case 'title': if (hit(OK)) startForest(); break;
+    case 'forest': updateForest(dt); break;
+    case 'trip': updateTrip(dt); break;
+    case 'fall': updateFall(dt); break;
+    case 'wake': updateWake(dt); break;
+    case 'battle': updateBattle(dt); break;
+    case 'menu': updateMenu(dt); break;
+    case 'bar': updateBar(dt); break;
+    case 'hitanim': updateHitAnim(dt); break;
+    case 'kill': updateKill(dt); break;
+    case 'sparetalk': case 'spare': updateSpare(dt); break;
+    case 'end': if (T > 1 && hit(OK)) startForest(); break;
+    case 'gameover': updateGameOver(dt); break;
+  }
+  ctx.globalAlpha = 1;
+  switch (state) {
+    case 'title': drawTitle(); break;
+    case 'forest': drawForest(); break;
+    case 'trip': drawTrip(); break;
+    case 'fall': drawFall(); break;
+    case 'wake': drawWake(); break;
+    case 'battle': drawBattle(); break;
+    case 'menu': drawMenu(); break;
+    case 'bar': drawBar(); break;
+    case 'hitanim': drawHitAnim(); break;
+    case 'kill': drawKill(); break;
+    case 'sparetalk': drawSpareTalk(); break;
+    case 'spare': drawSpare(); break;
+    case 'end': drawEnd(); break;
+    case 'gameover': drawGameOver(); break;
+  }
+  pressed = {};
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
