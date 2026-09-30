@@ -86,10 +86,21 @@ const WORLD_W = 1500;
 const HOLE = { x: 1320, y: 262 };
 let cam = 0;
 
-// Bäume
+// Welt / Biome
+const BIOMES = [
+  { name: 'Blumenbeet',    deco: 'flower',  bg: '#2c7a3a', ground: '#4aa04a', speck: '#5ab85a', path: '#a8944a', dark: 0.15 },
+  { name: 'Schneeland',    deco: 'pine',    bg: '#8fb0d0', ground: '#dfeaf5', speck: '#ffffff', path: '#b8cfe6', dark: 0.1 },
+  { name: 'Wüste',         deco: 'cactus',  bg: '#e8c878', ground: '#d8b060', speck: '#e8c470', path: '#c09848', dark: 0.1 },
+  { name: 'Lavahöhle',     deco: 'rock',    bg: '#1a0808', ground: '#3a1a1a', speck: '#ff6a1a', path: '#5a2a1a', dark: 0.5 },
+  { name: 'Kristallhöhle', deco: 'crystal', bg: '#0a1230', ground: '#1a2a4a', speck: '#6ab8ff', path: '#2a3a6a', dark: 0.45 }
+];
+const FOREST = { name: 'Wald', deco: 'tree', bg: '#123d1c', ground: '#1c5a28', speck: '#226b30', path: '#6b5030', dark: 0.6 };
+let style = FOREST;
+let biomeIdx = -1, ambushDone = true, ambushShow = false, bannerT = 0;
 const trees = [];
-(function () {
-  const r = rng(7);
+function genWorld(seed, forestHole) {
+  trees.length = 0;
+  const r = rng(seed);
   for (let x = 20; x < WORLD_W; x += 46 + r() * 30) {
     trees.push({ x, y: 30 + r() * 60, s: 0.9 + r() * 0.5, solid: false });
     trees.push({ x: x + 20, y: 400 + r() * 70, s: 0.9 + r() * 0.5, solid: false });
@@ -97,11 +108,12 @@ const trees = [];
   for (let i = 0; i < 16; i++) {
     const x = 260 + r() * 950;
     const y = 130 + r() * 260;
-    if (Math.abs(y - 262) < 55 && x > 900) continue;
+    if (Math.abs(y - 262) < 55 && (forestHole ? x > 900 : true)) continue;
     trees.push({ x, y, s: 1, solid: true });
   }
   trees.sort((a, b) => a.y - b.y);
-})();
+}
+genWorld(7, true);
 
 // Blume
 const flower = { hp: 50, maxHp: 50, face: 'happy', alpha: 0, x: 320, y: 150, shake: 0, show: false };
@@ -201,19 +213,56 @@ function drawFlower(x, y, face, alpha = 1, shake = 0, s = 1) {
   }
   ctx.restore();
 }
-function drawTree(t) {
-  const s = t.s;
-  ctx.fillStyle = '#4a2f18'; ctx.fillRect(t.x - 7 * s - cam, t.y - 4, 14 * s, 44 * s);
-  ctx.fillStyle = '#1f6b2a';
-  ctx.beginPath(); ctx.arc(t.x - cam, t.y - 14 * s, 30 * s, 0, 7); ctx.fill();
-  ctx.fillStyle = '#2a8a38';
-  ctx.beginPath(); ctx.arc(t.x - 8 * s - cam, t.y - 22 * s, 18 * s, 0, 7); ctx.fill();
+function drawDeco(t) {
+  const s = t.s, x = t.x - cam, y = t.y;
+  if (x < -60 || x > W + 60) return;
+  switch (style.deco) {
+    case 'flower':
+      ctx.fillStyle = '#2a7a2a'; ctx.fillRect(x - 2, y - 4, 4, 34 * s);
+      ctx.fillStyle = '#ffd400';
+      for (let k = 0; k < 6; k++) { const an = k * 1.047; ctx.beginPath(); ctx.arc(x + Math.cos(an) * 12 * s, y - 12 * s + Math.sin(an) * 12 * s, 8 * s, 0, 7); ctx.fill(); }
+      ctx.fillStyle = '#e08a00'; ctx.beginPath(); ctx.arc(x, y - 12 * s, 7 * s, 0, 7); ctx.fill();
+      break;
+    case 'pine':
+      ctx.fillStyle = '#4a2f18'; ctx.fillRect(x - 5 * s, y + 10, 10 * s, 30 * s);
+      for (let k = 0; k < 3; k++) {
+        const w = (34 - k * 8) * s, top = y - 40 * s + k * 20 * s;
+        ctx.fillStyle = '#1f5a3a'; ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x - w, top + 30 * s); ctx.lineTo(x + w, top + 30 * s); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x - w * 0.5, top + 15 * s); ctx.lineTo(x + w * 0.5, top + 15 * s); ctx.fill();
+      }
+      break;
+    case 'cactus':
+      ctx.fillStyle = '#2f8a3a'; ctx.fillRect(x - 8 * s, y - 30 * s, 16 * s, 70 * s);
+      ctx.fillRect(x - 24 * s, y - 10 * s, 16 * s, 8 * s); ctx.fillRect(x - 24 * s, y - 24 * s, 8 * s, 22 * s);
+      ctx.fillRect(x + 8 * s, y + 4 * s, 16 * s, 8 * s); ctx.fillRect(x + 16 * s, y - 14 * s, 8 * s, 22 * s);
+      ctx.fillStyle = '#1f6a2a'; ctx.fillRect(x - 2 * s, y - 30 * s, 4 * s, 70 * s);
+      break;
+    case 'rock':
+      ctx.fillStyle = '#2a2a30'; ctx.beginPath(); ctx.moveTo(x - 30 * s, y + 38 * s); ctx.lineTo(x - 18 * s, y - 20 * s); ctx.lineTo(x + 6 * s, y - 34 * s); ctx.lineTo(x + 28 * s, y - 6 * s); ctx.lineTo(x + 32 * s, y + 38 * s); ctx.fill();
+      ctx.strokeStyle = '#ff5a10'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 6 * s, y - 20 * s); ctx.lineTo(x + 2 * s, y + 2 * s); ctx.lineTo(x - 4 * s, y + 24 * s); ctx.stroke();
+      break;
+    case 'crystal':
+      for (let k = -1; k <= 1; k++) {
+        const h = (44 - Math.abs(k) * 14) * s, w = 9 * s;
+        ctx.fillStyle = k ? '#7a5aff' : '#4ad8ff';
+        ctx.beginPath(); ctx.moveTo(x + k * 14 * s, y + 38 * s - h); ctx.lineTo(x + k * 14 * s - w, y + 38 * s - h * 0.6); ctx.lineTo(x + k * 14 * s - w, y + 38 * s); ctx.lineTo(x + k * 14 * s + w, y + 38 * s); ctx.lineTo(x + k * 14 * s + w, y + 38 * s - h * 0.6); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(x + k * 14 * s - w + 2, y + 38 * s - h * 0.55, 3, h * 0.4);
+      }
+      break;
+    default:
+      ctx.fillStyle = '#4a2f18'; ctx.fillRect(x - 7 * s, y - 4, 14 * s, 44 * s);
+      ctx.fillStyle = '#1f6b2a';
+      ctx.beginPath(); ctx.arc(x, y - 14 * s, 30 * s, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2a8a38';
+      ctx.beginPath(); ctx.arc(x - 8 * s, y - 22 * s, 18 * s, 0, 7); ctx.fill();
+  }
 }
 
 // ---------- Wald ----------
 function startForest() {
   player.x = 80; player.y = 260; player.rot = 0; player.scale = 1;
   lv = 1; kills = 0; hp = maxHP(); flower.maxHp = 50; flower.hp = 50;
+  style = FOREST; genWorld(7, true); biomeIdx = -1; ambushDone = true; ambushShow = false; cam = 0; hintT = 0;
   go('forest');
 }
 let hintT = 0;
@@ -232,39 +281,82 @@ function updateForest(dt) {
     if (d < 26) { player.x = t.x + dx / (d || 1) * 26; player.y = t.y + 30 + dy / (d || 1) * 26; }
   }
   cam = Math.max(0, Math.min(WORLD_W - W, player.x - W / 2));
-  hintT += dt;
-  if (Math.hypot(player.x - (HOLE.x - 40), player.y - HOLE.y) < 20) {
-    beep(200, 0.15, 'sawtooth');
-    go('trip');
+  hintT += dt; bannerT = Math.max(0, bannerT - dt);
+  if (state === 'forest') {
+    if (Math.hypot(player.x - (HOLE.x - 40), player.y - HOLE.y) < 20) {
+      beep(200, 0.15, 'sawtooth');
+      go('trip');
+    }
+    return;
   }
+  // Biome: Blume lauert am Ende, danach geht es zum nächsten Biom
+  if (!ambushDone && player.x > 1150) {
+    ambushShow = true; flower.face = 'happy'; flower.alpha = 1;
+    say(['* Eine Blume versperrt den Weg!',
+         ['Hihihi... Du schon wieder, ' + PLAYER_NAME + '?', 'happy'],
+         ['Diesmal bin ich STÄRKER!', 'evil']], () => {
+      ambushShow = false;
+      flower.maxHp = 50 + 75 * (lv - 1); flower.hp = flower.maxHp;
+      flower.face = 'evil'; flower.alpha = 1;
+      beginRound(1.2);
+    });
+    return;
+  }
+  if (ambushDone && player.x > WORLD_W - 24) { biomeIdx++; beep(700, 0.15); enterBiome(false); }
+}
+function enterBiome(cleared) {
+  style = BIOMES[biomeIdx % BIOMES.length];
+  genWorld(100 + biomeIdx * 13, false);
+  player.x = 80; player.y = 260; player.rot = 0; player.scale = 1;
+  ambushDone = cleared; ambushShow = false; bannerT = 3.5; hintT = 0; cam = 0;
+  go('walk');
 }
 function drawForest() {
-  ctx.fillStyle = '#123d1c'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = style.bg; ctx.fillRect(0, 0, W, H);
   // Boden
-  ctx.fillStyle = '#1c5a28'; ctx.fillRect(0, 90, W, 350);
-  ctx.fillStyle = '#226b30';
+  ctx.fillStyle = style.ground; ctx.fillRect(0, 90, W, 350);
+  ctx.fillStyle = style.speck;
   const r = rng(3);
   for (let i = 0; i < 160; i++) { const x = r() * WORLD_W - cam, y = 100 + r() * 330; if (x > -10 && x < W) ctx.fillRect(x, y, 6, 3); }
   // Pfad
-  ctx.fillStyle = '#6b5030'; ctx.fillRect(-cam, 235, WORLD_W, 55);
+  ctx.fillStyle = style.path; ctx.fillRect(-cam, 235, WORLD_W, 55);
+  const hole = style === FOREST;
+  if (hole) {
   // Loch (sieht wie ein dunkler Fleck aus)
-  const ready = state === 'trip' || state === 'fall';
   ctx.fillStyle = '#2b1d10'; ctx.beginPath(); ctx.ellipse(HOLE.x - cam, HOLE.y, 34, 18, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(HOLE.x - cam, HOLE.y, 26, 12, 0, 0, 7); ctx.fill();
   // Wurzel
   ctx.strokeStyle = '#4a2f18'; ctx.lineWidth = 6;
   ctx.beginPath(); ctx.moveTo(HOLE.x - 70 - cam, HOLE.y + 6); ctx.quadraticCurveTo(HOLE.x - 55 - cam, HOLE.y - 12, HOLE.x - 38 - cam, HOLE.y + 4); ctx.stroke();
+  }
   // Bäume und Spieler nach y sortiert
-  const list = trees.map(t => ({ y: t.solid ? t.y + 30 : t.y + 30, f: () => drawTree(t) }));
+  const list = trees.map(t => ({ y: t.solid ? t.y + 30 : t.y + 30, f: () => drawDeco(t) }));
   list.push({ y: player.y + 22, f: () => drawPlayer(player.x - cam, player.y, player.rot, player.scale, player.step) });
   list.sort((a, b) => a.y - b.y).forEach(o => o.f());
   // Dunkle Ränder
   const g = ctx.createRadialGradient(W / 2, H / 2, 150, W / 2, H / 2, 420);
-  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.6)');
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,' + style.dark + ')');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   if (state === 'forest' && hintT < 8) {
     ctx.fillStyle = '#fff'; ctx.font = '18px "Courier New", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText('Laufe durch den Wald  (Pfeiltasten / WASD)', W / 2, 14);
+  }
+  if (state === 'walk') {
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    if (bannerT > 0) {
+      ctx.globalAlpha = Math.min(1, bannerT);
+      ctx.fillStyle = '#000'; ctx.fillRect(170, 10, 300, 44);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 26px "Courier New", monospace';
+      ctx.fillText(style.name, 320, 20);
+      ctx.globalAlpha = 1;
+    }
+    if (ambushDone && hintT < 10 && bannerT <= 0) {
+      ctx.fillStyle = '#fff'; ctx.font = '18px "Courier New", monospace';
+      ctx.fillText('Der Weg ist frei - geh nach rechts weiter!', 320, 14);
+    }
+    if (ambushShow) drawFlower(player.x + 110 - cam, player.y - 50, flower.face, 1, flower.face === 'evil' ? 2 : 0, 1);
+    if (dlg) drawTextBox(lineText().slice(0, Math.floor(dlg.c)));
+    ctx.textAlign = 'left';
   }
 }
 
@@ -547,11 +639,11 @@ function updateKill(dt) {
     say(['* Die Blume verschwindet...',
          '* ' + PLAYER_NAME + ' hat LV ' + lv + ' erreicht!',
          `* HP ist jetzt ${maxHP()}. Dein Schaden ist jetzt ${myDmg()}.`,
-         '* Aus dem Boden wächst eine neue, stärkere Blume...'], () => {
+         '* Der Weg nach vorne ist frei. Geh nach rechts weiter...'], () => {
       killTalk = false;
-      flower.maxHp = 50 + 75 * (lv - 1); flower.hp = flower.maxHp;
-      flower.alpha = 1; flower.face = 'evil';
-      beginRound(1.2);
+      flower.alpha = 1;
+      if (biomeIdx < 0) { biomeIdx = 0; enterBiome(true); }   // erstes Mal: weiter im Blumenbeet
+      else { ambushDone = true; hintT = 0; go('walk'); }
     });
   }
 }
@@ -630,6 +722,7 @@ function frame(now) {
   switch (state) {
     case 'title': if (hit(OK)) startForest(); break;
     case 'forest': updateForest(dt); break;
+    case 'walk': if (dlg) updateDlg(dt); else updateForest(dt); break;
     case 'trip': updateTrip(dt); break;
     case 'fall': updateFall(dt); break;
     case 'wake': updateWake(dt); break;
@@ -648,7 +741,7 @@ function frame(now) {
   ctx.globalAlpha = 1;
   switch (state) {
     case 'title': drawTitle(); break;
-    case 'forest': drawForest(); break;
+    case 'forest': case 'walk': drawForest(); break;
     case 'trip': drawTrip(); break;
     case 'fall': drawFall(); break;
     case 'wake': drawWake(); break;
