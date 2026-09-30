@@ -92,8 +92,11 @@ const BIOMES = [
   { name: 'Schneeland',    deco: 'pine',    bg: '#8fb0d0', ground: '#dfeaf5', speck: '#ffffff', path: '#b8cfe6', dark: 0.1 },
   { name: 'Wüste',         deco: 'cactus',  bg: '#e8c878', ground: '#d8b060', speck: '#e8c470', path: '#c09848', dark: 0.1 },
   { name: 'Lavahöhle',     deco: 'rock',    bg: '#1a0808', ground: '#3a1a1a', speck: '#ff6a1a', path: '#5a2a1a', dark: 0.5 },
-  { name: 'Kristallhöhle', deco: 'crystal', bg: '#0a1230', ground: '#1a2a4a', speck: '#6ab8ff', path: '#2a3a6a', dark: 0.45 }
+  { name: 'Kristallhöhle', deco: 'crystal', bg: '#0a1230', ground: '#1a2a4a', speck: '#6ab8ff', path: '#2a3a6a', dark: 0.45 },
+  { name: 'Thronsaal',     deco: 'pillar',  bg: '#12061f', ground: '#2a1a4a', speck: '#ffd400', path: '#7a2a9a', dark: 0.55, boss: true }
 ];
+const BOSS_HP = 900;
+let bossRounds = 0, endKind = 'spare';
 const FOREST = { name: 'Wald', deco: 'tree', bg: '#123d1c', ground: '#1c5a28', speck: '#226b30', path: '#6b5030', dark: 0.6 };
 let style = FOREST;
 let biomeIdx = -1, ambushDone = true, ambushShow = false, bannerT = 0;
@@ -180,7 +183,7 @@ function drawHeart(x, y, s = 1, col = '#f00') {
   ctx.bezierCurveTo(8, -12, 14, -2, 0, 8);
   ctx.fill(); ctx.restore();
 }
-function drawFlower(x, y, face, alpha = 1, shake = 0, s = 1) {
+function drawFlower(x, y, face, alpha = 1, shake = 0, s = 1, crown = false) {
   ctx.save(); ctx.globalAlpha = alpha;
   ctx.translate(x + (Math.random() - 0.5) * shake, y + (Math.random() - 0.5) * shake); ctx.scale(s, s);
   // Stiel
@@ -193,6 +196,10 @@ function drawFlower(x, y, face, alpha = 1, shake = 0, s = 1) {
     ctx.beginPath(); ctx.ellipse(Math.cos(a) * 30, Math.sin(a) * 30, 15, 11, a, 0, 7); ctx.fill();
   }
   ctx.fillStyle = '#ffd400'; ctx.beginPath(); ctx.arc(0, 0, 24, 0, 7); ctx.fill();
+  if (crown) {
+    ctx.fillStyle = '#e02020'; ctx.beginPath(); ctx.moveTo(-26, -34); ctx.lineTo(-30, -66); ctx.lineTo(-14, -48); ctx.lineTo(0, -72); ctx.lineTo(14, -48); ctx.lineTo(30, -66); ctx.lineTo(26, -34); ctx.fill();
+    ctx.fillStyle = '#a00'; ctx.fillRect(-26, -38, 52, 6);
+  }
   ctx.fillStyle = '#000';
   if (face === 'evil') {
     ctx.beginPath(); ctx.ellipse(-9, -4, 4, 6, 0, 0, 7); ctx.ellipse(9, -4, 4, 6, 0, 0, 7); ctx.fill();
@@ -237,6 +244,11 @@ function drawDeco(t) {
       ctx.fillRect(x + 8 * s, y + 4 * s, 16 * s, 8 * s); ctx.fillRect(x + 16 * s, y - 14 * s, 8 * s, 22 * s);
       ctx.fillStyle = '#1f6a2a'; ctx.fillRect(x - 2 * s, y - 30 * s, 4 * s, 70 * s);
       break;
+    case 'pillar':
+      ctx.fillStyle = '#c8b8e8'; ctx.fillRect(x - 12 * s, y - 40 * s, 24 * s, 80 * s);
+      ctx.fillStyle = '#a898c8'; ctx.fillRect(x + 4 * s, y - 40 * s, 8 * s, 80 * s);
+      ctx.fillStyle = '#ffd400'; ctx.fillRect(x - 18 * s, y - 48 * s, 36 * s, 8 * s); ctx.fillRect(x - 18 * s, y + 38 * s, 36 * s, 8 * s);
+      break;
     case 'rock':
       ctx.fillStyle = '#2a2a30'; ctx.beginPath(); ctx.moveTo(x - 30 * s, y + 38 * s); ctx.lineTo(x - 18 * s, y - 20 * s); ctx.lineTo(x + 6 * s, y - 34 * s); ctx.lineTo(x + 28 * s, y - 6 * s); ctx.lineTo(x + 32 * s, y + 38 * s); ctx.fill();
       ctx.strokeStyle = '#ff5a10'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 6 * s, y - 20 * s); ctx.lineTo(x + 2 * s, y + 2 * s); ctx.lineTo(x - 4 * s, y + 24 * s); ctx.stroke();
@@ -262,7 +274,7 @@ function drawDeco(t) {
 function startForest() {
   player.x = 80; player.y = 260; player.rot = 0; player.scale = 1;
   lv = 1; kills = 0; hp = maxHP(); flower.maxHp = 50; flower.hp = 50;
-  style = FOREST; genWorld(7, true); biomeIdx = -1; ambushDone = true; ambushShow = false; cam = 0; hintT = 0;
+  flower.boss = false; bossRounds = 0; endKind = 'spare'; flower.y = 130; style = FOREST; genWorld(7, true); biomeIdx = -1; ambushDone = true; ambushShow = false; cam = 0; hintT = 0;
   go('forest');
 }
 let hintT = 0;
@@ -292,11 +304,19 @@ function updateForest(dt) {
   // Biome: Blume lauert am Ende, danach geht es zum nächsten Biom
   if (!ambushDone && player.x > 1150) {
     ambushShow = true; flower.face = 'happy'; flower.alpha = 1;
-    say(['* Eine Blume versperrt den Weg!',
+    const boss = !!style.boss;
+    const lines = boss
+      ? ['* Ein gewaltiger Schatten füllt den Thronsaal...',
+         ['Ich bin der KÖNIG DER BLUMEN, ' + PLAYER_NAME + '!', 'happy'],
+         ['Du hast meine Untertanen getötet... oder verschont?', 'happy'],
+         ['Egal! Hier endet deine Reise!', 'evil']]
+      : ['* Eine Blume versperrt den Weg!',
          ['Hihihi... Du schon wieder, ' + PLAYER_NAME + '?', 'happy'],
-         ['Diesmal bin ich STÄRKER!', 'evil']], () => {
+         ['Diesmal bin ich STÄRKER!', 'evil']];
+    say(lines, () => {
       ambushShow = false;
-      flower.maxHp = 50 + 75 * (lv - 1); flower.hp = flower.maxHp;
+      flower.boss = boss; bossRounds = 0; flower.y = boss ? 118 : 130;
+      flower.maxHp = boss ? BOSS_HP : 50 + 75 * (lv - 1); flower.hp = flower.maxHp;
       flower.face = 'evil'; flower.alpha = 1;
       beginRound(1.2);
     });
@@ -354,7 +374,7 @@ function drawForest() {
       ctx.fillStyle = '#fff'; ctx.font = '18px "Courier New", monospace';
       ctx.fillText('Der Weg ist frei - geh nach rechts weiter!', 320, 14);
     }
-    if (ambushShow) drawFlower(player.x + 110 - cam, player.y - 50, flower.face, 1, flower.face === 'evil' ? 2 : 0, 1);
+    if (ambushShow) drawFlower(player.x + 110 - cam, player.y - 50, flower.face, 1, flower.face === 'evil' ? 2 : 0, style.boss ? 1.5 : 1, !!style.boss);
     if (dlg) drawTextBox(lineText().slice(0, Math.floor(dlg.c)));
     ctx.textAlign = 'left';
   }
@@ -470,13 +490,41 @@ function aimed(speed) {
   const dx = heart.x - flower.x, dy = heart.y - (flower.y + 20), d = Math.hypot(dx, dy) || 1;
   seed(flower.x, flower.y + 20, dx / d * speed, dy / d * speed);
 }
+let bossAng = 0;
+function bossPattern(dt, t) {
+  const k = 1 + 0.06 * bossRounds;
+  spawnA -= dt; spawnB -= dt; spawnC -= dt;
+  flower.shake = 0;
+  const fx = flower.x, fy = flower.y + 30;
+  if (t < 10) {                        // Dreifach-Fächer
+    if (spawnA <= 0) {
+      const base = Math.atan2(heart.y - fy, heart.x - fx);
+      for (let i = -1; i <= 1; i++) seed(fx, fy, Math.cos(base + i * 0.3) * 130 * k, Math.sin(base + i * 0.3) * 130 * k);
+      spawnA = 0.9 / k; flower.shake = 3;
+    }
+  } else if (t < 20) {                 // Spirale
+    if (spawnB <= 0) {
+      bossAng += 0.6;
+      for (let i = 0; i < 2; i++) { const an = bossAng + i * Math.PI; seed(fx, fy, Math.cos(an) * 95 * k, Math.sin(an) * 95 * k + 25); }
+      spawnB = 0.16 / k;
+    }
+  } else {                             // Samenwände mit Lücke + gezielte Samen
+    if (spawnC <= 0) {
+      const gap = box.x + 30 + Math.random() * (box.w - 80);
+      for (let x = box.x + 6; x < box.x + box.w; x += 16) if (Math.abs(x - gap - 20) > 24) seed(x, box.y - 20, 0, 100 * k);
+      spawnC = 1.6 / k;
+    }
+    if (spawnA <= 0) { aimed(120 * k); spawnA = 1.3; flower.shake = 3; }
+  }
+}
 function updateBattle(dt) {
   battleT += dt;
   const a = axis(), len = Math.hypot(a.x, a.y) || 1;
   const sp = down(['Shift']) ? 70 : 140;
   heart.x = Math.max(box.x + 10, Math.min(box.x + box.w - 10, heart.x + a.x / len * sp * dt));
   heart.y = Math.max(box.y + 10, Math.min(box.y + box.h - 10, heart.y + a.y / len * sp * dt));
-  if (battleT > 0) {
+  if (battleT > 0 && flower.boss) bossPattern(dt, battleT);
+  else if (battleT > 0) {
     const k = 1 + 0.06 * (lv - 1);
     const t = battleT;
     spawnA -= dt; spawnB -= dt; spawnC -= dt;
@@ -499,7 +547,7 @@ function updateBattle(dt) {
   for (const b of bullets) {
     b.x += b.vx * dt; b.y += b.vy * dt;
     if (inv <= 0 && battleT > 0 && Math.hypot(b.x - heart.x, b.y - heart.y) < b.r + 5) {
-      hp -= 4; inv = 1; b.dead = true; beep(120, 0.15, 'sawtooth', 0.05);
+      hp -= flower.boss ? 6 : 4; inv = 1; b.dead = true; beep(120, 0.15, 'sawtooth', 0.05);
       if (hp <= 0) { hp = 0; go('gameover'); return; }
     }
     if (b.x < -20 || b.x > W + 20 || b.y < -40 || b.y > H + 20) b.dead = true;
@@ -507,7 +555,8 @@ function updateBattle(dt) {
   bullets = bullets.filter(b => !b.dead);
   if (battleT >= BATTLE_TIME) {
     bullets = []; menuSel = 0; sparing = false; flower.face = 'happy';
-    menuText = '* Die Blume ist erschöpft. Was tust du?'; go('menu');
+    if (flower.boss) bossRounds++;
+    menuText = flower.boss ? '* Der Blumenkönig atmet schwer. Was tust du?' : '* Die Blume ist erschöpft. Was tust du?'; go('menu');
   }
 }
 function drawHUD() {
@@ -524,7 +573,7 @@ function drawBox(b) {
 }
 function drawBattle() {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-  drawFlower(flower.x, flower.y, flower.face, flower.alpha, flower.shake, 1.2);
+  drawFlower(flower.x, flower.y, flower.face, flower.alpha, flower.shake, flower.boss ? 1.5 : 1.2, flower.boss);
   // Timer-Balken
   if (state === 'battle') {
     const p = Math.max(0, Math.min(1, battleT / BATTLE_TIME));
@@ -552,7 +601,7 @@ function updateMenu(dt) {
 }
 function drawMenu() {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-  if (flower.alpha > 0) drawFlower(flower.x, flower.y, flower.face, flower.alpha, flower.shake, 1.2);
+  if (flower.alpha > 0) drawFlower(flower.x, flower.y, flower.face, flower.alpha, flower.shake, flower.boss ? 1.5 : 1.2, flower.boss);
   // Blumen-HP
   if (state === 'menu' || state === 'bar' || state === 'hitanim') {
     ctx.fillStyle = '#600'; ctx.fillRect(250, 260, 140, 10);
@@ -636,6 +685,12 @@ function updateKill(dt) {
   if (flower.alpha <= 0 && !killTalk) {
     killTalk = true;
     lv++; kills++; hp = maxHP();
+    if (flower.boss) {
+      say(['* Der Blumenkönig zerfällt zu Blütenstaub...',
+           '* ' + PLAYER_NAME + ' hat LV ' + lv + ' erreicht.',
+           '* Der Wald ist still geworden.'], () => { killTalk = false; endKind = 'boss_kill'; go('end'); });
+      return;
+    }
     say(['* Die Blume verschwindet...',
          '* ' + PLAYER_NAME + ' hat LV ' + lv + ' erreicht!',
          `* HP ist jetzt ${maxHP()}. Dein Schaden ist jetzt ${myDmg()}.`,
@@ -652,7 +707,14 @@ function drawKill() { drawMenu(); }
 
 // ---------- SPARE ----------
 function doSpare() {
-  sparing = true; flower.face = 'sad';
+  if (flower.boss && bossRounds < 3) {
+    flower.face = 'evil';
+    say([['Gnade?! Ich brauche deine Gnade nicht!', 'evil'], ['* Der Blumenkönig will noch nicht aufgeben...', 'evil']], () => { menuText = '* Vielleicht wird er müde, wenn du durchhältst.'; flower.face = 'happy'; go('menu'); });
+    go('menu');
+    return;
+  }
+  sparing = true; flower.face = 'sad'; endKind = flower.boss ? 'boss_spare' : 'spare';
+  if (flower.boss) { say([['Du... verschonst mich? Nach allem?', 'sad'], ['Niemand war je nett zu einem König...', 'sad'], ['Danke. Der Wald soll wieder blühen.', 'sad']], () => go('spare')); go('sparetalk'); return; }
   say([['Du... verschonst mich?', 'sad'], ['Niemand war je nett zu mir...', 'sad'], ['Danke. Ich werde nie wieder jemanden angreifen.', 'sad']], () => go('spare'));
   go('sparetalk');
 }
@@ -666,7 +728,7 @@ function drawSpare() {
   drawMenu();
   if (T > 1) {
     ctx.fillStyle = '#ff0'; ctx.font = FONT; ctx.textAlign = 'center';
-    ctx.fillText('* Die Blume geht fort. Du hast sie gerettet.', 320, 320);
+    ctx.fillText(flower.boss ? '* Der Blumenkönig geht fort. Der Wald blüht wieder.' : '* Die Blume geht fort. Du hast sie gerettet.', 320, 320);
     ctx.textAlign = 'left';
   }
 }
@@ -676,10 +738,13 @@ function drawEnd() {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.fillStyle = '#ff0'; ctx.font = 'bold 48px "Courier New", monospace';
-  ctx.fillText('ENDE', 320, 130);
+  ctx.fillText(endKind === 'spare' ? 'ENDE' : 'FINALE', 320, 130);
   ctx.fillStyle = '#fff'; ctx.font = FONT;
-  ctx.fillText(PLAYER_NAME + ' hat die Blume gerettet.', 320, 210);
-  ctx.fillText('Erreichtes LV: ' + lv + '   Getötet: ' + kills, 320, 250);
+  const msg = { spare: PLAYER_NAME + ' hat die Blume gerettet.',
+                boss_spare: PLAYER_NAME + ' hat den Blumenkönig verschont. Frieden!',
+                boss_kill: PLAYER_NAME + ' hat den Blumenkönig besiegt. Stille...' }[endKind];
+  ctx.fillText(msg, 320, 210);
+  ctx.fillText((endKind === 'boss_spare' ? 'Wahres Ende   ' : endKind === 'boss_kill' ? 'Blutiges Ende   ' : '') + 'LV: ' + lv + '   Getötet: ' + kills, 320, 250);
   drawHeart(320, 320, 2, '#f00');
   if (Math.floor(T * 2) % 2) { ctx.font = '18px "Courier New", monospace'; ctx.fillText('Z / Enter: Nochmal spielen', 320, 400); }
   ctx.textAlign = 'left';
