@@ -11,11 +11,12 @@
 </style>
 </head>
 <body>
-<canvas id="c" width="640" height="480"></canvas>
+<canvas id="c" width="320" height="240"></canvas>
 <script>
 const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
 const W = 640, H = 480;
+const PLAYER_NAME = 'PLAYER';
 const FONT = 'bold 22px "Courier New", monospace';
 
 // ---------- Eingabe ----------
@@ -310,14 +311,14 @@ function updateWake(dt) {
   if (dlg) { updateDlg(dt); return; }
   if (wakeStage === 0 && T > 1.6) {
     wakeStage = 1;
-    say(['* ...', '* Du öffnest die Augen. Unter dir liegen goldgelbe Blumen.', '* Sie haben deinen Sturz abgefedert. Du hast überlebt!'], () => { wakeStage = 2; T = 0; });
+    say(['* ...', '* ' + PLAYER_NAME + ' öffnet die Augen. Unter dir liegen goldgelbe Blumen.', '* Sie haben den Sturz abgefedert. ' + PLAYER_NAME + ' hat überlebt!'], () => { wakeStage = 2; T = 0; });
   } else if (wakeStage === 2) {
     if (T > 1) { wakeStage = 3; T = 0; flower.show = true; beep(600, 0.1); }
   } else if (wakeStage === 3) {
     flower.alpha = Math.min(1, T * 2);
     if (T > 1) {
       wakeStage = 4;
-      say([['Hallo! Ich bin die Blume. Du bist wohl neu hier...', 'happy'],
+      say([['Hallo, ' + PLAYER_NAME + '! Ich bin die Blume. Du bist wohl neu hier...', 'happy'],
            ['In dieser Welt gilt: TÖTEN oder GETÖTET WERDEN.', 'happy'],
            ['...', 'happy'],
            ['Bereit zu STERBEN?!', 'evil']], startBattle);
@@ -413,11 +414,11 @@ function updateBattle(dt) {
 }
 function drawHUD() {
   ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillStyle = '#fff';
-  ctx.fillText('LV ' + lv, 30, 440);
-  ctx.fillText('HP', 200, 440);
-  ctx.fillStyle = '#c00'; ctx.fillRect(240, 440, maxHP() * 3, 22);
-  ctx.fillStyle = '#ff0'; ctx.fillRect(240, 440, hp * 3, 22);
-  ctx.fillStyle = '#fff'; ctx.fillText(hp + ' / ' + maxHP(), 250 + maxHP() * 3, 440);
+  ctx.fillText(PLAYER_NAME + '  LV ' + lv, 30, 440);
+  ctx.fillText('HP', 250, 440);
+  ctx.fillStyle = '#c00'; ctx.fillRect(290, 440, maxHP() * 3, 22);
+  ctx.fillStyle = '#ff0'; ctx.fillRect(290, 440, hp * 3, 22);
+  ctx.fillStyle = '#fff'; ctx.fillText(hp + ' / ' + maxHP(), 300 + maxHP() * 3, 440);
 }
 function drawBox(b) {
   ctx.fillStyle = '#000'; ctx.fillRect(b.x, b.y, b.w, b.h);
@@ -538,7 +539,7 @@ function updateKill(dt) {
     killTalk = true;
     lv++; kills++; hp = maxHP();
     say(['* Die Blume verschwindet...',
-         '* Du hast LV ' + lv + ' erreicht!',
+         '* ' + PLAYER_NAME + ' hat LV ' + lv + ' erreicht!',
          `* HP ist jetzt ${maxHP()}. Dein Schaden ist jetzt ${myDmg()}.`,
          '* Aus dem Boden wächst eine neue, stärkere Blume...'], () => {
       killTalk = false;
@@ -579,7 +580,7 @@ function drawEnd() {
   ctx.fillStyle = '#ff0'; ctx.font = 'bold 48px "Courier New", monospace';
   ctx.fillText('ENDE', 320, 130);
   ctx.fillStyle = '#fff'; ctx.font = FONT;
-  ctx.fillText('Du hast die Blume gerettet.', 320, 210);
+  ctx.fillText(PLAYER_NAME + ' hat die Blume gerettet.', 320, 210);
   ctx.fillText('Erreichtes LV: ' + lv + '   Getötet: ' + kills, 320, 250);
   drawHeart(320, 320, 2, '#f00');
   if (Math.floor(T * 2) % 2) { ctx.font = '18px "Courier New", monospace'; ctx.fillText('Z / Enter: Nochmal spielen', 320, 400); }
@@ -635,6 +636,9 @@ function frame(now) {
     case 'end': if (T > 1 && hit(OK)) startForest(); break;
     case 'gameover': updateGameOver(dt); break;
   }
+  // Pixel-Look: interne Auflösung 320x240, Spielkoordinaten bleiben 640x480
+  ctx.setTransform(0.5, 0, 0, 0.5, 0, 0);
+  ctx.imageSmoothingEnabled = false;
   ctx.globalAlpha = 1;
   switch (state) {
     case 'title': drawTitle(); break;
