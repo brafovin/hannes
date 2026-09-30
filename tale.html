@@ -145,13 +145,19 @@ function drawPlayer(x, y, rot = 0, sc = 1, walk = 0) {
   ctx.save();
   ctx.translate(x, y); ctx.rotate(rot); ctx.scale(sc, sc);
   const b = Math.sin(walk) * 3;
-  ctx.fillStyle = '#3a4a9a'; // Beine
-  ctx.fillRect(-7, 10, 6, 12 + b); ctx.fillRect(1, 10, 6, 12 - b);
-  ctx.fillStyle = '#b06ad0'; ctx.fillRect(-10, -6, 20, 18);          // Pullover
-  ctx.fillStyle = '#7a3f9a'; ctx.fillRect(-10, 2, 20, 3);
+  ctx.fillStyle = '#2f6fd0'; // blaue Jeans
+  ctx.fillRect(-8, 10, 7, 12 + b); ctx.fillRect(1, 10, 7, 12 - b);
+  ctx.fillStyle = '#1f4f9a'; ctx.fillRect(-1, 10, 2, 10);
+  ctx.fillStyle = '#3aa03a'; ctx.fillRect(-11, -6, 22, 18);          // grün-gelber Pullover
+  ctx.fillStyle = '#f0d020';
+  ctx.fillRect(-11, -1, 22, 3); ctx.fillRect(-11, 6, 22, 3);
+  ctx.fillStyle = '#3aa03a'; ctx.fillRect(-14, -4, 4, 12); ctx.fillRect(10, -4, 4, 12);
+  ctx.fillStyle = '#f2c9a0'; ctx.fillRect(-14, 8, 4, 4); ctx.fillRect(10, 8, 4, 4); // Hände
   ctx.fillStyle = '#f2c9a0'; ctx.fillRect(-11, -26, 22, 22);         // Kopf
-  ctx.fillStyle = '#5a3a20'; ctx.fillRect(-12, -28, 24, 9);          // Haare
-  ctx.fillStyle = '#000'; ctx.fillRect(-6, -14, 3, 3); ctx.fillRect(3, -14, 3, 3);
+  ctx.fillStyle = '#6b4423'; ctx.fillRect(-12, -29, 24, 10);         // braune Haare
+  ctx.fillRect(-12, -22, 4, 8); ctx.fillRect(8, -22, 4, 8);
+  ctx.fillStyle = '#2a1808';                                         // Augen zu
+  ctx.fillRect(-7, -12, 5, 2); ctx.fillRect(2, -12, 5, 2);
   ctx.restore();
 }
 function drawHeart(x, y, s = 1, col = '#f00') {
